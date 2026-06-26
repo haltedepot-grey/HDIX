@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "commandes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "dateCreation", "order": "DESCENDING" },
+        { "fieldPath": "vendeur", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "commandes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "statut", "order": "ASCENDING" },
+        { "fieldPath": "dateCreation", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

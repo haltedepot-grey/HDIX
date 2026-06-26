@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HDIX - Initialisation</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        body { background: #f5f7fa; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .card { max-width: 600px; background: white; border-radius: 16px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .btn-init { width: 100%; padding: 16px; background: #2d7d46; color: white; border: none; border-radius: 10px; font-size: 18px; font-weight: 600; cursor: pointer; }
+        .btn-init:hover { background: #3a8d56; }
+        .log { background: #f8f9fa; border-radius: 8px; padding: 16px; margin-top: 16px; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 13px; white-space: pre-wrap; }
+        .log-success { color: #2d7d46; }
+        .log-error { color: #c0392b; }
+        .log-info { color: #1a2b4c; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>🚀 HDIX - Initialisation</h1>
+    <p>Cliquez sur le bouton pour créer automatiquement toutes les collections et documents de test.</p>
+    <button class="btn-init" onclick="initDatabase()">📦 Initialiser la base</button>
+    <div class="log" id="logContainer">⏳ En attente...</div>
+</div>
+
+<script src="firebase-config.js"></script>
+<script>
+const DATA = {
+    users: [
+        { id: 'admin_001', data: { nom: 'Admin HDIX', role: 'admin', code_secret: 'A7K8L9M2', telephone: '+241 00 00 00 00' } },
+        { id: 'livreur_marc', data: { nom: 'Marc', role: 'livreur', code_secret: 'MARC2026', telephone: '+241 77 12 34 56' } },
+        { id: 'vendeur_marie', data: { nom: 'Marie Cosmetics', role: 'vendeur', code_secret: 'MARIE001', telephone: '+241 66 12 34 56' } }
+    ],
+    vendeurs: [
+        { id: 'vendeur_marie', data: { nom: 'Marie Cosmetics', telephone: '+241 66 12 34 56', abreviation: 'MODE' } },
+        { id: 'vendeur_jean', data: { nom: 'Jean Électro', telephone: '+241 77 88 99 00', abreviation: 'JEAN' } }
+    ],
+    livreurs: [
+        { id: 'livreur_001', data: { nom: 'Marc', telephone: '+241 77 12 34 56', zone: 'Libreville', actif: true, capacite: 15 } },
+        { id: 'livreur_002', data: { nom: 'Sophie', telephone: '+241 66 78 90 12', zone: 'Akanda', actif: true, capacite: 10 } }
+    ],
+    config: [
+        { id: 'admin_config', data: { masterCode: 'X7kL9$mQ#pR2vN&wZ', lastRotation: new Date() } }
+    ],
+    commandes: [
+        { id: null, data: { numero: 'HDIX-001', vendeurId: 'vendeur_marie', vendeur: 'Marie Cosmetics', articles: [{ quantite: 2, nom: 'Cartons de lait' }], prixTotal: 12000, fraisLivraison: 2000, fraisInclus: false, zone: 'Libreville', quartier: 'Batterie IV', ville: 'Libreville', note: 'Sonner 3 fois', statut: 'À appeler', dateCreation: new Date() } }
+    ]
+};
+
+const logContainer = document.getElementById('logContainer');
+
+function addLog(msg, type = 'info') {
+    const cls = type === 'success' ? 'log-success' : type === 'error' ? 'log-error' : 'log-info';
+    logContainer.innerHTML += `<div class="${cls}">${msg}</div>`;
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+async function initDatabase() {
+    if (!confirm('⚠️ Écraser les données existantes ?')) return;
+    logContainer.innerHTML = '';
+    addLog('🚀 Début de l\'initialisation...', 'info');
+    
+    try {
+        for (const collectionName in DATA) {
+            addLog(`📁 Traitement: ${collectionName}`, 'info');
+            for (const doc of DATA[collectionName]) {
+                const ref = doc.id ? db.collection(collectionName).doc(doc.id) : db.collection(collectionName).doc();
+                await ref.set(doc.data);
+                addLog(`  ✅ ${doc.id || 'auto'} enregistré`, 'success');
+            }
+        }
+        addLog('🎉 Initialisation terminée !', 'success');
+        addLog('🔑 Admin: A7K8L9M2 | Livreur: MARC2026 | Vendeur: MARIE001', 'info');
+    } catch (e) {
+        addLog(`❌ ERREUR: ${e.message}`, 'error');
+    }
+}
+</script>
+</body>
+</html>

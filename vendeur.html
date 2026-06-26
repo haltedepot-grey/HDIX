@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>HDIX - Vendeur</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="assets/icon-192.png" />
+    <meta name="theme-color" content="#1a2b4c" />
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app-container">
+    <header class="admin-header">
+        <div class="header-left">
+            <h1>HDIX</h1>
+            <span class="badge">Vendeur</span>
+        </div>
+        <div class="header-right">
+            <span id="vendeurName">Vendeur</span>
+            <button onclick="logout()" class="btn-logout">Déconnexion</button>
+        </div>
+    </header>
+
+    <div class="livreur-card">
+        <div><strong>Boutique :</strong> <span id="vendeurBoutique">Chargement...</span></div>
+        <div><strong>Ventes du mois :</strong> <span id="vendeurVentes">0 FCFA</span></div>
+        <div><strong>Commandes :</strong> <span id="vendeurCommandes">0</span></div>
+    </div>
+
+    <h3 style="margin-top:24px;">📊 Mon bilan</h3>
+    <div id="bilanVendeurContainer">
+        <p class="empty-message">Chargement de votre bilan...</p>
+    </div>
+
+    <h3 style="margin-top:24px;">📋 Mes commandes</h3>
+    <div id="commandesVendeurContainer">
+        <p class="empty-message">Aucune commande.</p>
+    </div>
+</div>
+
+<script src="firebase-config.js"></script>
+<script src="vendeur-script.js"></script>
+</body>
+</html>

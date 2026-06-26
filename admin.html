@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>HDIX - Admin</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="assets/icon-192.png" />
+    <meta name="theme-color" content="#1a2b4c" />
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        /* Styles supplémentaires pour le spinner et les filtres */
+        .spinner-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .spinner-overlay.active {
+            display: flex;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #e2e8f0;
+            border-top: 5px solid #1a2b4c;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .filter-btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .filter-btn.active {
+            background: #1a2b4c;
+            color: white;
+        }
+        .filter-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .refresh-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .refresh-btn:hover {
+            transform: rotate(180deg);
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin: 16px 0;
+        }
+        .kpi-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .kpi-card .number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1a2b4c;
+        }
+        .kpi-card .label {
+            font-size: 13px;
+            color: #6b7a8f;
+        }
+        .kpi-card .trend {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .trend-up { color: #2d7d46; }
+        .trend-down { color: #c0392b; }
+
+        @media (max-width: 600px) {
+            .kpi-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .optimization-badge {
+            background: #8e44ad;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Spinner global -->
+<div class="spinner-overlay" id="globalSpinner">
+    <div class="spinner"></div>
+</div>
+
+<div class="app-container">
+    <!-- En-tête -->
+    <header class="admin-header">
+        <div class="header-left">
+            <h1>HDIX</h1>
+            <span class="badge">Admin</span>
+        </div>
+        <div class="header-right">
+            <span id="adminName">Admin</span>
+            <button onclick="logout()" class="btn-logout">Déconnexion</button>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <div class="admin-nav">
+        <button class="nav-btn active" onclick="showSection('kpi')">📊 KPI</button>
+        <button class="nav-btn" onclick="showSection('commandes')">📦 Commandes</button>
+        <button class="nav-btn" onclick="showSection('appels')">📞 Appels</button>
+        <button class="nav-btn" onclick="showSection('vendeurs')">👤 Vendeurs</button>
+        <button class="nav-btn" onclick="showSection('livreurs')">🚚 Livreurs</button>
+        <button class="nav-btn" onclick="showSection('stockage')">📦 Stockage</button>
+        <button class="nav-btn" onclick="showSection('bilan')">📊 Bilan</button>
+        <button class="nav-btn" onclick="showSection('inscriptions')">📝 Inscriptions</button>
+        <button class="nav-btn" onclick="showSection('tournees')">🗺️ Tournées</button>
+    </div>
+
+    <!-- ========== SECTION KPI ========== -->
+    <div id="section-kpi" class="section active">
+        <h3 style="display:flex;justify-content:space-between;align-items:center;">
+            📊 Tableau de bord KPI
+            <button onclick="loadKPI()" class="refresh-btn">🔄</button>
+        </h3>
+
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="number" id="kpiTotal">0</div>
+                <div class="label">Total commandes</div>
+                <div class="trend trend-up" id="kpiTotalTrend">▲ 0%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="number" id="kpiAppeler">0</div>
+                <div class="label">À appeler</div>
+                <div class="trend trend-up" id="kpiAppelerTrend">▲ 0%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="number" id="kpiLivree">0</div>
+                <div class="label">Livrées</div>
+                <div class="trend trend-up" id="kpiLivreeTrend">▲ 0%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="number" id="kpiCA">0</div>
+                <div class="label">Chiffre d'affaires</div>
+                <div class="trend trend-up" id="kpiCATrend">▲ 0%</div>
+            </div>
+        </div>
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="number" id="kpiVendeurs">0</div>
+                <div class="label">Vendeurs actifs</div>
+            </div>
+            <div class="kpi-card">
+                <div class="number" id="kpiLivreurs">0</div>
+                <div class="label">Livreurs actifs</div>
+            </div>
+            <div class="kpi-card">
+                <div class="number" id="kpiTauxLivraison">0%</div>
+                <div class="label">Taux de livraison</div>
+            </div>
+            <div class="kpi-card">
+                <div class="number" id="kpiMoyenne">0</div>
+                <div class="label">Panier moyen (FCFA)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== SECTION COMMANDES ========== -->
+    <div id="section-commandes" class="section" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3>📋 Commandes</h3>
+            <button onclick="loadCommandes()" class="refresh-btn">🔄</button>
+        </div>
+
+        <div class="main-actions">
+            <button onclick="openWizard()" class="btn-create">✨ Nouvelle commande</button>
+            <button onclick="openCollageWizard()" class="btn-create" style="background:#8e44ad;margin-top:8px;">📋 Coller depuis WhatsApp</button>
+        </div>
+
+        <!-- Filtres -->
+        <div class="filter-buttons">
+            <button onclick="filtrerCommandes('all')" class="filter-btn active" data-filter="all">📋 Toutes</button>
+            <button onclick="filtrerCommandes('À appeler')" class="filter-btn" data-filter="À appeler" style="background:#fef9e7;">📞 À appeler</button>
+            <button onclick="filtrerCommandes('En-cours')" class="filter-btn" data-filter="En-cours" style="background:#ebf5fb;">🔄 En-cours</button>
+            <button onclick="filtrerCommandes('Livrée')" class="filter-btn" data-filter="Livrée" style="background:#eafaf1;">✅ Livrée</button>
+            <button onclick="filtrerCommandes('Indisponible')" class="filter-btn" data-filter="Indisponible" style="background:#fdedec;">⏳ Indisponible</button>
+            <button onclick="filtrerCommandes('Reportée')" class="filter-btn" data-filter="Reportée" style="background:#fef9e7;">📅 Reportée</button>
+            <button onclick="filtrerCommandes('Refusée')" class="filter-btn" data-filter="Refusée" style="background:#fdedec;">❌ Refusée</button>
+            <button onclick="filtrerCommandes('Annulée')" class="filter-btn" data-filter="Annulée" style="background:#f5f5f5;">⛔ Annulée</button>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-number" id="statAppeler">0</span>
+                <span class="stat-label">À appeler</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="statLivree">0</span>
+                <span class="stat-label">Livrées</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number" id="statTotal">0</span>
+                <span class="stat-label">Total</span>
+            </div>
+        </div>
+
+        <div class="commandes-list">
+            <div id="commandesContainer">
+                <div class="spinner" style="margin:30px auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== SECTION APPELS ========== -->
+    <div id="section-appels" class="section" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3>📞 Commandes à appeler</h3>
+            <button onclick="loadAppels()" class="refresh-btn">🔄</button>
+        </div>
+        <div id="appelsContainer">
+            <div class="spinner" style="margin:30px auto;"></div>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;">
+            <button onclick="lancerAppelSuivant()" class="btn-primary" style="flex:1;">📞 Appeler le suivant</button>
+            <button onclick="envoyerSMS()" class="btn-primary" style="flex:1;background:#8e44ad;">🤖 Envoyer SMS IA</button>
+        </div>
+
+        <!-- Modale d'appel -->
+        <div id="appelModal" class="modal">
+            <div class="modal-content">
+                <button class="modal-close" onclick="fermerAppelModal()">✕</button>
+                <div id="appelContent">
+                    <p class="empty-message">Aucun appel en cours.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== SECTION VENDEURS ========== -->
+    <div id="section-vendeurs" class="section" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3>👤 Gestion des vendeurs</h3>
+            <button onclick="loadVendeurs()" class="refresh-btn">🔄</button>
+        </div>
+        <button onclick="openVendeurForm()" class="btn-primary" style="margin:12px 0;">➕ Ajouter un vendeur</button>
+        <div id="vendeursList">
+            <div class="spinner" style="margin:30px auto;"></div>
+        </div>
+    </div>
+
+    <!-- ========== SECTION LIVREURS ========== -->
+    <div id="section-livreurs" class="section" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3>🚚 Gestion des livreurs</h3>
+            <button onclick="loadLivreurs()" class="refresh-btn">🔄</button>
+        </div>
+        <button onclick="openLivreurForm()" class="btn-primary" style="margin:12px 0;">➕ Ajouter un livreur</button>
+        <div id="livreursList">
+            <div class="spinner" style="margin:30px auto;"></div>
+        </div>
+    </div>
+
+    <!-- ========== SECTION STOCKAGE ========== -->
+    <div id="section-stockage" class="section" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3>📦 Frais de stockage</h3>
+            <button onclick="loadStockage()" class="refresh-btn">🔄</button>
+        </div>
+        <div class="stockage-grid">
+            <div class="stockage-card">
+                <h4>Casiers occupés</h4>
+                <div id="stockageResume">Chargement...</div>
+            </div>
+            <div class="stockage-card">
+                <h4>Dettes du mois</h4>
+                <div id="stockageDettes">Chargement...</div>
+            </div>
+        </div>
+        <button onclick="activerPrelevements()" class="btn-primary" style="margin:12px 0;">🔁 Activer les prélèvements (J-2)</button>
+        <button onclick="appliquerPenalites()" class="btn-danger" style="margin:12px 0;">⚠️ Appliquer les pénalités</button>
+        <div id="stockageList">
+            <div class="spinner" style="margin:30px auto;"></div>
+        </div>
+    </div>
+
+    <!-- ========== SECTION BILAN ========== -->
+    <div id="section-bilan" class="section" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3>📊 Bilan</h3>
+            <button onclick="loadVendeursForBilan()" class="refresh-btn">🔄</button>
+        </div>
+        <div class="bilan-section">
+            <div class="bilan-controls">
+                <select id="bilanVendeurSelect">
+                    <option value="all">Tous les vendeurs</option>
+                </select>
+                <button onclick="generateBilan()" class="btn-copy" style="flex:1;">📊 Générer</button>
+                <button onclick="copyBilan()" class="btn-copy">📋 Copier</button>
+                <button onclick="generatePDF()" class="btn-copy" style="background:#8e44ad;">📄 PDF</button>
+                <button onclick="envoyerBilanWhatsApp()" class="btn-copy" style="background:#25D366;">💬 WhatsApp</button>
+            </div>
+            <div id="bilanContainer">
+                <p class="empty-message">Sélectionnez un vendeur et cliquez sur "Générer".</p>
+            </div>
+        </div>
+        <div class="bilan-section" style="margin-top:16px;">
+            <h3>📈 Rapport mensuel</h3>
+            <button onclick="generateMonthlyReport()" class="btn-primary">📊 Générer le rapport du mois</button>
+            <div id="monthlyReportContainer">
+                <p class="empty-message">Cliquez sur "Générer" pour voir le rapport mensuel.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== SECTION INSCRIPTIONS ========== -->
+    <div id="section-inscriptions" class="section" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3>📝 Demandes d'inscription</h3>
+            <button onclick="loadInscriptions()" class="refresh-btn">🔄</button>
+        </div>
+        <div id="inscriptionsList">
+            <div class="spinner" style="margin:30px auto;"></div>
+        </div>
+    </div>
+
+    <!-- ========== SECTION TOURNÉES ========== -->
+    <div id="section-tournees" class="section" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3>🗺️ Optimisation des tournées</h3>
+            <button onclick="optimiserTournees()" class="refresh-btn">🔄</button>
+        </div>
+        <div style="margin:16px 0;">
+            <button onclick="optimiserTournees()" class="btn-primary" style="flex:1;">🔍 Optimiser les tournées</button>
+            <button onclick="attributionAuto()" class="btn-primary" style="flex:1;margin-top:8px;background:#8e44ad;">🤖 Attribution automatique</button>
+        </div>
+        <div id="tourneesContainer">
+            <p class="empty-message">Les commandes en cours seront optimisées ici.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ========== MODALE WIZARD COMMANDE ========== -->
+<div class="modal" id="wizardModal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeWizard()">✕</button>
+
+        <!-- Étape 0 : Vendeur -->
+        <div class="step active" data-step="0">
+            <div class="step-title">👤 ÉTAPE 0/6 - VENDEUR</div>
+            <div class="step-subtitle">Sélectionnez ou ajoutez un vendeur</div>
+            <div class="vendeur-select-row">
+                <label>Vendeur</label>
+                <select id="vendeurSelect">
+                    <option value="">-- Sélectionnez un vendeur --</option>
+                </select>
+            </div>
+            <button onclick="addVendeurFromWizard()" class="add-article-btn">➕ Ajouter un nouveau vendeur</button>
+            <div class="actions">
+                <button onclick="closeWizard()" class="btn-secondary">Annuler</button>
+                <button onclick="validateStep(0)" class="btn-primary">OK</button>
+            </div>
+        </div>
+
+        <!-- Étape 1 : Articles -->
+        <div class="step" data-step="1">
+            <div class="step-title">📦 ÉTAPE 1/6 - ARTICLES</div>
+            <div class="step-subtitle">Saisissez les articles de la commande</div>
+            <div id="articlesContainer">
+                <div class="article-row">
+                    <input type="number" class="article-qty" placeholder="Qté" min="1" value="1" />
+                    <input type="text" class="article-name" placeholder="Nom de l'article" />
+                </div>
+            </div>
+            <button onclick="addArticleRow()" class="add-article-btn">+ Ajouter un autre article</button>
+            <div class="actions">
+                <button onclick="prevStep()" class="btn-secondary">Retour</button>
+                <button onclick="validateStep(1)" class="btn-primary">OK</button>
+            </div>
+        </div>
+
+        <!-- Étape 2 : Prix -->
+        <div class="step" data-step="2">
+            <div class="step-title">💰 ÉTAPE 2/6 - PRIX TOTAL</div>
+            <div class="step-subtitle">Indiquez le prix total de la commande</div>
+            <div class="form-group">
+                <label>Prix total (FCFA)</label>
+                <input type="number" id="prixTotal" placeholder="Ex: 12000" min="0" />
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="fraisInclus" checked />
+                    Frais de livraison inclus dans le prix
+                </label>
+            </div>
+            <div class="actions">
+                <button onclick="prevStep()" class="btn-secondary">Retour</button>
+                <button onclick="validateStep(2)" class="btn-primary">OK</button>
+            </div>
+        </div>
+
+        <!-- Étape 3 : Frais de livraison -->
+        <div class="step" data-step="3">
+            <div class="step-title">🚚 ÉTAPE 3/6 - FRAIS DE LIVRAISON</div>
+            <div class="step-subtitle">Sélectionnez la zone de livraison</div>
+            <div class="form-group">
+                <label>Zone de livraison</label>
+                <select id="zoneSelect">
+                    <option value="">Sélectionnez une zone</option>
+                    <option value="Libreville">Libreville : 2.000 FCFA</option>
+                    <option value="Akanda">Akanda : 3.000 FCFA</option>
+                    <option value="Owendo">Owendo : 3.000 FCFA</option>
+                    <option value="Bikélé">Bikélé : 3.000 FCFA</option>
+                    <option value="Autres">Autres : (à confirmer)</option>
+                </select>
+            </div>
+            <p class="info-text">Sélectionnez "Autres" si la zone n'est pas dans la liste.</p>
+            <div class="actions">
+                <button onclick="prevStep()" class="btn-secondary">Retour</button>
+                <button onclick="validateStep(3)" class="btn-primary">OK</button>
+            </div>
+        </div>
+
+        <!-- Étape 4 : Lieu -->
+        <div class="step" data-step="4">
+            <div class="step-title">📍 ÉTAPE 4/6 - LIEU DE LIVRAISON</div>
+            <div class="step-subtitle">Indiquez le quartier et la ville</div>
+            <div class="required-note">
+                ⚠️ Les deux champs sont obligatoires. Les commandes sans quartier précis sont traitées plus longuement.
+            </div>
+            <div class="form-group">
+                <label>Quartier</label>
+                <input type="text" id="quartierInput" placeholder="Ex: Batterie IV" />
+            </div>
+            <div class="form-group">
+                <label>Ville</label>
+                <input type="text" id="villeInput" placeholder="Ex: Libreville" />
+            </div>
+            <div class="actions">
+                <button onclick="prevStep()" class="btn-secondary">Retour</button>
+                <button onclick="validateStep(4)" class="btn-primary">OK</button>
+            </div>
+        </div>
+
+        <!-- Étape 5 : Note -->
+        <div class="step" data-step="5">
+            <div class="step-title">📝 ÉTAPE 5/6 - NOTE PARTICULIÈRE</div>
+            <div class="step-subtitle">Ajoutez une note si nécessaire (optionnel)</div>
+            <div class="form-group">
+                <label>Note</label>
+                <textarea id="noteInput" rows="3" placeholder="Ex: Sonner 3 fois, porte rouge..."></textarea>
+            </div>
+            <div class="actions">
+                <button onclick="prevStep()" class="btn-secondary">Retour</button>
+                <button onclick="validateStep(5)" class="btn-primary">OK</button>
+            </div>
+        </div>
+
+        <!-- Étape 6 : Récapitulatif -->
+        <div class="step" data-step="6">
+            <div class="step-title">📋 RÉCAPITULATIF</div>
+            <div id="recapContainer"></div>
+            <div class="actions">
+                <button onclick="prevStep()" class="btn-secondary">Modifier</button>
+                <button onclick="saveCommande()" class="btn-primary btn-success">✅ Enregistrer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========== MODALE COLLAGE ========== -->
+<div class="modal" id="collageModal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeCollageWizard()">✕</button>
+        <div class="step-title">📋 COLLER DEPUIS WHATSAPP</div>
+        <div class="step-subtitle">Collez votre bon de commande ci-dessous</div>
+        <div class="collage-zone">
+            <textarea id="collageInput" rows="6" placeholder="Collez ici le texte de votre bon de commande..."></textarea>
+        </div>
+        <p class="info-text">L'application va analyser le texte et remplir automatiquement les champs.</p>
+        <div class="actions">
+            <button onclick="closeCollageWizard()" class="btn-secondary">Annuler</button>
+            <button onclick="analyserCollage()" class="btn-collage">🔍 Analyser</button>
+        </div>
+        <div id="collageResult" style="margin-top:16px;"></div>
+    </div>
+</div>
+
+<script src="firebase-config.js"></script>
+<script src="admin-script.js"></script>
+</body>
+</html>
