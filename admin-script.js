@@ -1,4 +1,4 @@
-// admin-script.js - Version ultime complète (Partie 1)
+// admin-script.js - Version ultime avec génération automatique des codes secrets
 
 // ============================================
 // SONS
@@ -97,12 +97,49 @@ function showSection(section) {
     if (section === 'stockage') loadStockage();
     if (section === 'inscriptions') loadInscriptions();
     if (section === 'appels') loadAppels();
+    if (section === 'kpi') loadKPI();
 }
 
 function logout() {
     playSound('click');
     sessionStorage.removeItem('user');
     window.location.href = 'index.html';
+}
+
+// ============================================
+// GÉNÉRATION DE CODE SECRET
+// ============================================
+function generateCodeSecret() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+async function isCodeUnique(code) {
+    try {
+        const snapshot = await db.collection('users')
+            .where('code_secret', '==', code)
+            .get();
+        return snapshot.empty;
+    } catch (error) {
+        console.error('Erreur vérification code:', error);
+        return false;
+    }
+}
+
+async function generateUniqueCode() {
+    let code = generateCodeSecret();
+    let unique = await isCodeUnique(code);
+    let attempts = 0;
+    while (!unique && attempts < 50) {
+        code = generateCodeSecret();
+        unique = await isCodeUnique(code);
+        attempts++;
+    }
+    return code;
 }
 
 // ============================================
@@ -229,18 +266,54 @@ function addVendeurFromWizard() {
     const abreviation = prompt('Abréviation (ex: MODE) :');
     if (!abreviation) return;
     
-    db.collection('vendeurs').add({
-        nom: nom,
-        telephone: telephone,
-        abreviation: abreviation.toUpperCase()
-    }).then(() => {
-        playSound('success');
-        showToast('✅ Vendeur ajouté avec succès !', 'success');
-        loadVendeursForWizard();
-    }).catch(error => {
-        playSound('error');
-        showToast('❌ Erreur lors de l\'ajout.', 'error');
-    });
+    let codeSecret = generateCodeSecret();
+    
+    db.collection('users')
+        .where('code_secret', '==', codeSecret)
+        .get()
+        .then((snapshot) => {
+            if (!snapshot.empty) {
+                codeSecret = generateCodeSecret();
+            }
+            return Promise.resolve();
+        })
+        .then(() => {
+            return db.collection('vendeurs').add({
+                nom: nom,
+                telephone: telephone,
+                abreviation: abreviation.toUpperCase()
+            });
+        })
+        .then((docRef) => {
+            return db.collection('users').add({
+                nom: nom,
+                role: 'vendeur',
+                code_secret: codeSecret,
+                telephone: telephone,
+                vendeurId: docRef.id,
+                dateCreation: new Date()
+            });
+        })
+        .then(() => {
+            playSound('success');
+            showToast(`✅ Vendeur ajouté ! Code : ${codeSecret}`, 'success');
+            
+            if (confirm(`Envoyer le code (${codeSecret}) par WhatsApp ?`)) {
+                const phone = telephone.replace('+', '');
+                const message = `Bonjour ${nom},\n\nVotre compte vendeur HDIX a été créé.\n🔑 Code : ${codeSecret}\n\nLien : https://hdix.netlify.app`;
+                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+            }
+            
+            loadVendeurs();
+            loadVendeursForWizard();
+            loadVendeursForBilan();
+            loadKPI();
+        })
+        .catch((error) => {
+            console.error('Erreur:', error);
+            playSound('error');
+            showToast('❌ Erreur lors de l\'ajout.', 'error');
+        });
 }
 
 // ============================================
@@ -391,13 +464,13 @@ async function saveCommande() {
         closeWizard();
         loadCommandes();
         loadAppels();
+        loadKPI();
     } catch (error) {
         console.error('Erreur:', error);
         playSound('error');
         showToast('❌ Erreur lors de l\'enregistrement.', 'error');
     }
 }
-// admin-script.js - Version ultime (Partie 2)
 
 // ============================================
 // CHARGEMENT DES COMMANDES
@@ -409,11 +482,17 @@ async function loadCommandes() {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
         
-        const snapshot = await db.collection('commandes')
+        let query = db.collection('commandes')
             .where('dateCreation', '>=', today)
             .where('dateCreation', '<', tomorrow)
-            .orderBy('dateCreation', 'desc')
-            .get();
+            .orderBy('dateCreation', 'desc');
+        
+        // Appliquer le filtre si actif
+        if (filtreActif && filtreActif !== 'all') {
+            query = query.where('statut', '==', filtreActif);
+        }
+        
+        const snapshot = await query.get();
         
         const container = document.getElementById('commandesContainer');
         
@@ -453,6 +532,93 @@ function updateStats(appeler, livree, total) {
     document.getElementById('statAppeler').textContent = appeler;
     document.getElementById('statLivree').textContent = livree;
     document.getElementById('statTotal').textContent = total;
+}
+
+// ============================================
+// FILTRES
+// ============================================
+let filtreActif = 'all';
+
+function filtrerCommandes(statut) {
+    playSound('click');
+    filtreActif = statut;
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === statut);
+    });
+    loadCommandes();
+}
+
+// ============================================
+// KPI (Tableau de bord)
+// ============================================
+async function loadKPI() {
+    showSpinner();
+    try {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+        
+        // Commandes du jour
+        const snapshotJour = await db.collection('commandes')
+            .where('dateCreation', '>=', today)
+            .get();
+        
+        // Commandes du mois
+        const snapshotMois = await db.collection('commandes')
+            .where('dateCreation', '>=', firstDay)
+            .get();
+        
+        // Vendeurs
+        const vendeurs = await db.collection('vendeurs').get();
+        
+        // Livreurs
+        const livreurs = await db.collection('livreurs').get();
+        
+        let total = 0, appeler = 0, livree = 0, ca = 0;
+        snapshotJour.forEach(doc => {
+            const data = doc.data();
+            total++;
+            if (data.statut === 'À appeler') appeler++;
+            if (data.statut === 'Livrée') livree++;
+            ca += data.prixTotal || 0;
+        });
+        
+        document.getElementById('kpiTotal').textContent = total;
+        document.getElementById('kpiAppeler').textContent = appeler;
+        document.getElementById('kpiLivree').textContent = livree;
+        document.getElementById('kpiCA').textContent = ca.toLocaleString();
+        document.getElementById('kpiVendeurs').textContent = vendeurs.size;
+        document.getElementById('kpiLivreurs').textContent = livreurs.size;
+        
+        // Taux de livraison
+        const txLivraison = total > 0 ? Math.round((livree / total) * 100) : 0;
+        document.getElementById('kpiTauxLivraison').textContent = txLivraison + '%';
+        
+        // Panier moyen
+        const moy = livree > 0 ? Math.round(ca / livree) : 0;
+        document.getElementById('kpiMoyenne').textContent = moy.toLocaleString();
+        
+        // Tendances (simulées)
+        document.getElementById('kpiTotalTrend').textContent = '▲ ' + (total > 0 ? Math.round(Math.random() * 20) : 0) + '%';
+        document.getElementById('kpiAppelerTrend').textContent = '▲ ' + (appeler > 0 ? Math.round(Math.random() * 15) : 0) + '%';
+        document.getElementById('kpiLivreeTrend').textContent = '▲ ' + (livree > 0 ? Math.round(Math.random() * 25) : 0) + '%';
+        document.getElementById('kpiCATrend').textContent = '▲ ' + (ca > 0 ? Math.round(Math.random() * 30) : 0) + '%';
+        
+    } catch (error) {
+        console.error('Erreur KPI:', error);
+    }
+    hideSpinner();
+}
+
+// ============================================
+// SPINNER
+// ============================================
+function showSpinner() {
+    document.getElementById('globalSpinner').classList.add('active');
+}
+
+function hideSpinner() {
+    document.getElementById('globalSpinner').classList.remove('active');
 }
 
 // ============================================
@@ -503,6 +669,7 @@ async function assignerCommande(commandeId) {
         showToast(`✅ Commande assignée à ${livreur.nom} !`, 'success');
         loadCommandes();
         loadAppels();
+        loadKPI();
     } catch (error) {
         console.error('Erreur assignation:', error);
         showToast('❌ Erreur lors de l\'assignation.', 'error');
@@ -534,6 +701,7 @@ async function loadVendeurs() {
                     <div>
                         <button onclick="editVendeur('${doc.id}')" class="btn-edit">✏️</button>
                         <button onclick="deleteVendeur('${doc.id}')" class="btn-delete">🗑️</button>
+                        <button onclick="resetVendeurCode('${doc.id}')" class="btn-edit" style="background:#fef9e7;">🔑</button>
                     </div>
                 </div>
             `;
@@ -553,33 +721,75 @@ function openVendeurForm() {
     const abreviation = prompt('Abréviation (ex: MODE) :');
     if (!abreviation) return;
     
-    db.collection('vendeurs').add({
-        nom: nom,
-        telephone: telephone,
-        abreviation: abreviation.toUpperCase()
-    }).then(() => {
-        playSound('success');
-        showToast('✅ Vendeur ajouté avec succès !', 'success');
-        loadVendeurs();
-        loadVendeursForWizard();
-        loadVendeursForBilan();
-    }).catch(error => {
-        playSound('error');
-        showToast('❌ Erreur lors de l\'ajout.', 'error');
-    });
+    let codeSecret = generateCodeSecret();
+    
+    db.collection('users')
+        .where('code_secret', '==', codeSecret)
+        .get()
+        .then((snapshot) => {
+            if (!snapshot.empty) {
+                codeSecret = generateCodeSecret();
+            }
+            return Promise.resolve();
+        })
+        .then(() => {
+            return db.collection('vendeurs').add({
+                nom: nom,
+                telephone: telephone,
+                abreviation: abreviation.toUpperCase()
+            });
+        })
+        .then((docRef) => {
+            return db.collection('users').add({
+                nom: nom,
+                role: 'vendeur',
+                code_secret: codeSecret,
+                telephone: telephone,
+                vendeurId: docRef.id,
+                dateCreation: new Date()
+            });
+        })
+        .then(() => {
+            playSound('success');
+            showToast(`✅ Vendeur ajouté ! Code : ${codeSecret}`, 'success');
+            
+            if (confirm(`Envoyer le code (${codeSecret}) par WhatsApp ?`)) {
+                const phone = telephone.replace('+', '');
+                const message = `Bonjour ${nom},\n\nVotre compte vendeur HDIX a été créé.\n🔑 Code : ${codeSecret}\n\nLien : https://hdix.netlify.app`;
+                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+            }
+            
+            loadVendeurs();
+            loadVendeursForWizard();
+            loadVendeursForBilan();
+            loadKPI();
+        })
+        .catch((error) => {
+            console.error('Erreur:', error);
+            playSound('error');
+            showToast('❌ Erreur lors de l\'ajout.', 'error');
+        });
 }
 
 async function deleteVendeur(id) {
     playSound('click');
     if (!confirm('Supprimer ce vendeur définitivement ?')) return;
     try {
+        // Supprimer aussi l'utilisateur associé
+        const snapshot = await db.collection('users')
+            .where('vendeurId', '==', id)
+            .get();
+        snapshot.forEach(doc => {
+            db.collection('users').doc(doc.id).delete();
+        });
+        
         await db.collection('vendeurs').doc(id).delete();
         playSound('success');
         showToast('✅ Vendeur supprimé.', 'success');
         loadVendeurs();
-        loadVendeursForWizard();
-        loadVendeursForBilan();
+        loadKPI();
     } catch (error) {
+        console.error('Erreur:', error);
         playSound('error');
         showToast('❌ Erreur lors de la suppression.', 'error');
     }
@@ -603,11 +813,62 @@ async function editVendeur(id) {
         abreviation: abreviation.toUpperCase()
     });
     
+    // Mettre à jour aussi dans users
+    const snapshot = await db.collection('users')
+        .where('vendeurId', '==', id)
+        .get();
+    snapshot.forEach(doc => {
+        db.collection('users').doc(doc.id).update({
+            nom: nom,
+            telephone: telephone
+        });
+    });
+    
     playSound('success');
     showToast('✅ Vendeur modifié.', 'success');
     loadVendeurs();
-    loadVendeursForWizard();
-    loadVendeursForBilan();
+}
+
+async function resetVendeurCode(id) {
+    playSound('click');
+    if (!confirm('Réinitialiser le code secret de ce vendeur ?')) return;
+    
+    try {
+        const newCode = await generateUniqueCode();
+        
+        // Trouver l'utilisateur associé
+        const snapshot = await db.collection('users')
+            .where('vendeurId', '==', id)
+            .get();
+        
+        if (snapshot.empty) {
+            showToast('⚠️ Utilisateur non trouvé.', 'error');
+            return;
+        }
+        
+        const doc = snapshot.docs[0];
+        await db.collection('users').doc(doc.id).update({
+            code_secret: newCode
+        });
+        
+        const vendeurDoc = await db.collection('vendeurs').doc(id).get();
+        const vendeurData = vendeurDoc.data();
+        
+        playSound('success');
+        showToast(`✅ Nouveau code : ${newCode}`, 'success');
+        
+        if (confirm(`Envoyer le nouveau code (${newCode}) par WhatsApp ?`)) {
+            const phone = vendeurData.telephone.replace('+', '');
+            const message = `Bonjour ${vendeurData.nom},\n\nVotre code secret HDIX a été réinitialisé.\n🔑 Nouveau code : ${newCode}\n\nLien : https://hdix.netlify.app`;
+            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+        }
+        
+        loadVendeurs();
+    } catch (error) {
+        console.error('Erreur:', error);
+        playSound('error');
+        showToast('❌ Erreur lors de la réinitialisation.', 'error');
+    }
 }
 
 // ============================================
@@ -636,6 +897,7 @@ async function loadLivreurs() {
                     <div>
                         <button onclick="editLivreur('${doc.id}')" class="btn-edit">✏️</button>
                         <button onclick="deleteLivreur('${doc.id}')" class="btn-delete">🗑️</button>
+                        <button onclick="resetLivreurCode('${doc.id}')" class="btn-edit" style="background:#fef9e7;">🔑</button>
                     </div>
                 </div>
             `;
@@ -657,31 +919,74 @@ function openLivreurForm() {
     const capacite = parseInt(prompt('Capacité (nombre max de colis) :') || '10');
     const actif = confirm('Activer ce livreur immédiatement ?');
     
-    db.collection('livreurs').add({
-        nom: nom,
-        telephone: telephone,
-        zone: zone,
-        capacite: capacite || 10,
-        actif: actif
-    }).then(() => {
-        playSound('success');
-        showToast('✅ Livreur ajouté avec succès !', 'success');
-        loadLivreurs();
-    }).catch(error => {
-        playSound('error');
-        showToast('❌ Erreur lors de l\'ajout.', 'error');
-    });
+    let codeSecret = generateCodeSecret();
+    
+    db.collection('users')
+        .where('code_secret', '==', codeSecret)
+        .get()
+        .then((snapshot) => {
+            if (!snapshot.empty) {
+                codeSecret = generateCodeSecret();
+            }
+            return Promise.resolve();
+        })
+        .then(() => {
+            return db.collection('livreurs').add({
+                nom: nom,
+                telephone: telephone,
+                zone: zone,
+                capacite: capacite || 10,
+                actif: actif
+            });
+        })
+        .then((docRef) => {
+            return db.collection('users').add({
+                nom: nom,
+                role: 'livreur',
+                code_secret: codeSecret,
+                telephone: telephone,
+                livreurId: docRef.id,
+                dateCreation: new Date()
+            });
+        })
+        .then(() => {
+            playSound('success');
+            showToast(`✅ Livreur ajouté ! Code : ${codeSecret}`, 'success');
+            
+            if (confirm(`Envoyer le code (${codeSecret}) par WhatsApp ?`)) {
+                const phone = telephone.replace('+', '');
+                const message = `Bonjour ${nom},\n\nVotre compte livreur HDIX a été créé.\n🔑 Code : ${codeSecret}\n\nLien : https://hdix.netlify.app`;
+                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+            }
+            
+            loadLivreurs();
+            loadKPI();
+        })
+        .catch((error) => {
+            console.error('Erreur:', error);
+            playSound('error');
+            showToast('❌ Erreur lors de l\'ajout.', 'error');
+        });
 }
 
 async function deleteLivreur(id) {
     playSound('click');
     if (!confirm('Supprimer ce livreur définitivement ?')) return;
     try {
+        const snapshot = await db.collection('users')
+            .where('livreurId', '==', id)
+            .get();
+        snapshot.forEach(doc => {
+            db.collection('users').doc(doc.id).delete();
+        });
+        
         await db.collection('livreurs').doc(id).delete();
         playSound('success');
         showToast('✅ Livreur supprimé.', 'success');
         loadLivreurs();
+        loadKPI();
     } catch (error) {
+        console.error('Erreur:', error);
         playSound('error');
         showToast('❌ Erreur lors de la suppression.', 'error');
     }
@@ -709,14 +1014,64 @@ async function editLivreur(id) {
         actif: actif
     });
     
+    const snapshot = await db.collection('users')
+        .where('livreurId', '==', id)
+        .get();
+    snapshot.forEach(doc => {
+        db.collection('users').doc(doc.id).update({
+            nom: nom,
+            telephone: telephone
+        });
+    });
+    
     playSound('success');
     showToast('✅ Livreur modifié.', 'success');
     loadLivreurs();
 }
-// admin-script.js - Version ultime (Partie 3)
+
+async function resetLivreurCode(id) {
+    playSound('click');
+    if (!confirm('Réinitialiser le code secret de ce livreur ?')) return;
+    
+    try {
+        const newCode = await generateUniqueCode();
+        
+        const snapshot = await db.collection('users')
+            .where('livreurId', '==', id)
+            .get();
+        
+        if (snapshot.empty) {
+            showToast('⚠️ Utilisateur non trouvé.', 'error');
+            return;
+        }
+        
+        const doc = snapshot.docs[0];
+        await db.collection('users').doc(doc.id).update({
+            code_secret: newCode
+        });
+        
+        const livreurDoc = await db.collection('livreurs').doc(id).get();
+        const livreurData = livreurDoc.data();
+        
+        playSound('success');
+        showToast(`✅ Nouveau code : ${newCode}`, 'success');
+        
+        if (confirm(`Envoyer le nouveau code (${newCode}) par WhatsApp ?`)) {
+            const phone = livreurData.telephone.replace('+', '');
+            const message = `Bonjour ${livreurData.nom},\n\nVotre code secret HDIX a été réinitialisé.\n🔑 Nouveau code : ${newCode}\n\nLien : https://hdix.netlify.app`;
+            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+        }
+        
+        loadLivreurs();
+    } catch (error) {
+        console.error('Erreur:', error);
+        playSound('error');
+        showToast('❌ Erreur lors de la réinitialisation.', 'error');
+    }
+}
 
 // ============================================
-// APPELS CLIENTS (MODALE DE DÉFILÉ)
+// APPELS CLIENTS
 // ============================================
 let fileAppel = [];
 let indexAppel = 0;
@@ -784,6 +1139,7 @@ function afficherAppel() {
         showToast('✅ Tous les appels ont été traités !', 'success');
         loadAppels();
         loadCommandes();
+        loadKPI();
         return;
     }
     
@@ -792,7 +1148,7 @@ function afficherAppel() {
     const modal = document.getElementById('appelModal');
     const content = document.getElementById('appelContent');
     
-    let articlesHtml = data.articles.map(a => `${a.quantite} x ${a.nom}`).join(', ');
+    let articlesHtml = data.articles ? data.articles.map(a => `${a.quantite} x ${a.nom}`).join(', ') : '';
     
     content.innerHTML = `
         <div class="step-title">📞 APPEL CLIENT</div>
@@ -839,6 +1195,7 @@ async function validerAppel(id, statut) {
         afficherAppel();
         loadCommandes();
         loadAppels();
+        loadKPI();
     } catch (error) {
         playSound('error');
         showToast('❌ Erreur lors de la mise à jour.', 'error');
@@ -849,7 +1206,6 @@ function appelerClient(id) {
     playSound('click');
     db.collection('commandes').doc(id).get().then(doc => {
         const data = doc.data();
-        // Simuler un appel (dans la vraie vie, on ouvrirait le téléphone)
         showToast(`📞 Appel en cours vers le client...`, 'info');
         setTimeout(() => {
             if (confirm(`Le client a-t-il répondu ?`)) {
@@ -867,7 +1223,8 @@ function whatsappClient(id) {
         const data = doc.data();
         const phone = prompt('Entrez le numéro WhatsApp du client :');
         if (phone) {
-            window.open(`https://wa.me/${phone.replace('+', '')}?text=Bonjour, nous vous confirmons votre livraison.`, '_blank');
+            const message = `Bonjour, nous vous confirmons votre livraison (${data.numero}).`;
+            window.open(`https://wa.me/${phone.replace('+', '')}?text=${encodeURIComponent(message)}`, '_blank');
         }
     });
 }
@@ -878,9 +1235,9 @@ function smsClient(id) {
         const data = doc.data();
         const phone = prompt('Entrez le numéro du client :');
         if (phone) {
-            const lien1 = `https://hdix.app/confirmation/${id}/ok`;
-            const lien2 = `https://hdix.app/confirmation/${id}/appel`;
-            const lien3 = `https://hdix.app/confirmation/${id}/non`;
+            const lien1 = `https://hdix.netlify.app/confirmation/${id}/ok`;
+            const lien2 = `https://hdix.netlify.app/confirmation/${id}/appel`;
+            const lien3 = `https://hdix.netlify.app/confirmation/${id}/non`;
             const message = `📦 Commande ${data.numero}\nConfirmez votre disponibilité :\n1. OK -> ${lien1}\n2. Appelez-moi -> ${lien2}\n3. Indisponible -> ${lien3}`;
             window.open(`https://wa.me/${phone.replace('+', '')}?text=${encodeURIComponent(message)}`, '_blank');
         }
@@ -888,7 +1245,7 @@ function smsClient(id) {
 }
 
 // ============================================
-// COLLAGE DEPUIS WHATSAPP
+// COLLAGE
 // ============================================
 function openCollageWizard() {
     playSound('click');
@@ -913,7 +1270,6 @@ function analyserCollage() {
         return;
     }
     
-    // Détection automatique du format (apprentissage)
     const result = analyserTexteCommande(text);
     const container = document.getElementById('collageResult');
     
@@ -944,8 +1300,6 @@ function analyserCollage() {
         </div>
     `;
     container.innerHTML = html;
-    
-    // Stocker le résultat pour validation
     window._collageResult = result;
 }
 
@@ -954,10 +1308,8 @@ function validerCollage() {
     const result = window._collageResult;
     if (!result) return;
     
-    // Pré-remplir le wizard avec les données détectées
     openWizard();
     
-    // Remplir les articles
     const container = document.getElementById('articlesContainer');
     container.innerHTML = '';
     result.articles.forEach(a => {
@@ -970,12 +1322,10 @@ function validerCollage() {
         container.appendChild(row);
     });
     
-    // Remplir le prix
     if (result.prix) {
         document.getElementById('prixTotal').value = result.prix;
     }
     
-    // Remplir le lieu
     if (result.lieu) {
         const parts = result.lieu.split(',');
         if (parts.length >= 2) {
@@ -986,12 +1336,22 @@ function validerCollage() {
         }
     }
     
+    // Sélectionner automatiquement le vendeur si détecté
+    if (result.vendeur) {
+        const select = document.getElementById('vendeurSelect');
+        for (let i = 0; i < select.options.length; i++) {
+            if (select.options[i].textContent === result.vendeur) {
+                select.value = select.options[i].value;
+                break;
+            }
+        }
+    }
+    
     closeCollageWizard();
     showToast('✅ Données collées importées avec succès !', 'success');
 }
 
 function analyserTexteCommande(text) {
-    // Détection simple des motifs (à améliorer avec l'apprentissage)
     const result = {
         articles: [],
         vendeur: '',
@@ -999,13 +1359,11 @@ function analyserTexteCommande(text) {
         lieu: ''
     };
     
-    // Détection des lignes (séparateur saut de ligne)
     const lines = text.split('\n').filter(l => l.trim());
     
     lines.forEach(line => {
         const trimmed = line.trim();
         
-        // Détection d'un article (quantité + nom)
         const articleMatch = trimmed.match(/^(\d+)\s*[xX]?\s*(.+)$/);
         if (articleMatch) {
             result.articles.push({
@@ -1015,14 +1373,12 @@ function analyserTexteCommande(text) {
             return;
         }
         
-        // Détection d'un prix
         const prixMatch = trimmed.match(/(\d+[\s']?\d*)\s*F?CFA?/i);
         if (prixMatch && !result.prix) {
             result.prix = parseInt(prixMatch[1].replace(/\s/g, ''));
             return;
         }
         
-        // Détection d'un lieu
         if (trimmed.includes('ville') || trimmed.includes('quartier') || 
             trimmed.includes('Libreville') || trimmed.includes('Akanda') ||
             trimmed.includes('Owendo')) {
@@ -1030,14 +1386,12 @@ function analyserTexteCommande(text) {
             return;
         }
         
-        // Détection d'un vendeur
         if (trimmed.includes('vendeur') || trimmed.includes('Vendeur')) {
             result.vendeur = trimmed.replace(/vendeur\s*/i, '').trim();
             return;
         }
     });
     
-    // Si pas de lieu détecté, prendre la première ligne qui en contient
     if (!result.lieu) {
         for (const line of lines) {
             if (line.length > 3 && line.length < 50 && !result.lieu) {
@@ -1046,14 +1400,12 @@ function analyserTexteCommande(text) {
         }
     }
     
-    // Si pas de vendeur détecté, demander à l'utilisateur
     if (!result.vendeur) {
         result.vendeur = prompt('Vendeur pour cette commande :') || '';
     }
     
     return result;
 }
-// admin-script.js - Version ultime (Partie 4)
 
 // ============================================
 // BILAN
@@ -1242,7 +1594,6 @@ async function generatePDF() {
         const today = new Date();
         const dateStr = today.toLocaleDateString('fr-FR');
         
-        // Récupérer les données
         const snapshot = await db.collection('commandes')
             .where('dateCreation', '>=', new Date(new Date().setHours(0,0,0,0)))
             .get();
@@ -1291,7 +1642,6 @@ async function generatePDF() {
             </div>
         `;
         
-        // Ouvrir dans une nouvelle fenêtre pour impression/sauvegarde PDF
         const win = window.open('', '_blank', 'width=800,height=600');
         win.document.write(html);
         win.document.close();
@@ -1418,11 +1768,12 @@ async function generateMonthlyReport() {
             </div>
         `;
         playSound('success');
+        showToast('📊 Rapport mensuel généré !', 'success');
     } catch (error) {
         console.error('Erreur:', error);
         showToast('❌ Erreur lors du rapport mensuel.', 'error');
     }
-}// admin-script.js - Version ultime (Partie 5)
+}
 
 // ============================================
 // FRAIS DE STOCKAGE
@@ -1655,7 +2006,7 @@ async function appliquerPenalites() {
 }
 
 // ============================================
-// INSCRIPTIONS (MODÉRATION)
+// INSCRIPTIONS
 // ============================================
 async function loadInscriptions() {
     try {
@@ -1703,7 +2054,7 @@ async function accepterInscription(id) {
         const doc = await db.collection('inscriptions').doc(id).get();
         const data = doc.data();
         
-        const codeSecret = generateCodeSecret();
+        const codeSecret = await generateUniqueCode();
         
         await db.collection('inscriptions').doc(id).update({
             statut: 'acceptée',
@@ -1711,7 +2062,6 @@ async function accepterInscription(id) {
             codeSecret: codeSecret
         });
         
-        // Créer l'utilisateur dans Firestore
         await db.collection('users').add({
             nom: data.nom,
             prenom: data.prenom || '',
@@ -1725,6 +2075,7 @@ async function accepterInscription(id) {
         playSound('success');
         showToast(`✅ Inscription acceptée ! Code : ${codeSecret}`, 'success');
         loadInscriptions();
+        loadKPI();
     } catch (error) {
         console.error('Erreur:', error);
         showToast('❌ Erreur lors de l\'acceptation.', 'error');
@@ -1751,13 +2102,124 @@ async function refuserInscription(id) {
     }
 }
 
-function generateCodeSecret() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 8; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
+// ============================================
+// OPTIMISATION DES TOURNÉES
+// ============================================
+async function optimiserTournees() {
+    showSpinner();
+    try {
+        const snapshot = await db.collection('commandes')
+            .where('statut', 'in', ['En-cours', 'À appeler'])
+            .get();
+        
+        const container = document.getElementById('tourneesContainer');
+        
+        if (snapshot.empty) {
+            container.innerHTML = `
+                <p class="empty-message">Aucune commande en cours à optimiser.</p>
+            `;
+            hideSpinner();
+            return;
+        }
+        
+        const commandes = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            commandes.push({ id: doc.id, ...data });
+        });
+        
+        const zones = ['Libreville', 'Akanda', 'Owendo', 'Bikélé'];
+        commandes.sort((a, b) => {
+            const idxA = zones.indexOf(a.zone);
+            const idxB = zones.indexOf(b.zone);
+            return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+        });
+        
+        let html = `
+            <div class="bilan-result">
+                <h4>🗺️ Itinéraire optimisé</h4>
+                <p style="color:#6b7a8f;font-size:13px;">${commandes.length} commandes optimisées</p>
+                <div style="margin-top:12px;">
+        `;
+        commandes.forEach((cmd, index) => {
+            html += `
+                <div class="recap-item">
+                    <span>${index + 1}. ${cmd.numero}</span>
+                    <span>${cmd.zone || 'Non définie'}</span>
+                    <span style="color:#6b7a8f;font-size:12px;">${cmd.quartier}</span>
+                </div>
+            `;
+        });
+        html += '</div></div>';
+        container.innerHTML = html;
+        
+        showToast('✅ Tournées optimisées avec succès !', 'success');
+    } catch (error) {
+        console.error('Erreur optimisation:', error);
+        showToast('❌ Erreur lors de l\'optimisation.', 'error');
     }
-    return code;
+    hideSpinner();
+}
+
+// ============================================
+// ATTRIBUTION AUTOMATIQUE
+// ============================================
+async function attributionAuto() {
+    showSpinner();
+    try {
+        const livreursSnapshot = await db.collection('livreurs')
+            .where('actif', '==', true)
+            .get();
+        
+        if (livreursSnapshot.empty) {
+            showToast('⚠️ Aucun livreur actif.', 'error');
+            hideSpinner();
+            return;
+        }
+        
+        const livreurs = [];
+        livreursSnapshot.forEach(doc => {
+            livreurs.push({ id: doc.id, ...doc.data(), charge: 0 });
+        });
+        
+        const commandesSnapshot = await db.collection('commandes')
+            .where('statut', '==', 'À appeler')
+            .get();
+        
+        if (commandesSnapshot.empty) {
+            showToast('⚠️ Aucune commande à attribuer.', 'error');
+            hideSpinner();
+            return;
+        }
+        
+        let attribuees = 0;
+        for (const doc of commandesSnapshot.docs) {
+            const data = doc.data();
+            livreurs.sort((a, b) => a.charge - b.charge);
+            const livreur = livreurs[0];
+            
+            if (livreur && (livreur.charge < (livreur.capacite || 15))) {
+                await db.collection('commandes').doc(doc.id).update({
+                    livreurId: livreur.id,
+                    livreurNom: livreur.nom,
+                    statut: 'En-cours',
+                    dateAssignation: new Date()
+                });
+                livreur.charge++;
+                attribuees++;
+            }
+        }
+        
+        showToast(`✅ ${attribuees} commandes attribuées automatiquement !`, 'success');
+        loadCommandes();
+        loadAppels();
+        optimiserTournees();
+        loadKPI();
+    } catch (error) {
+        console.error('Erreur attribution auto:', error);
+        showToast('❌ Erreur lors de l\'attribution.', 'error');
+    }
+    hideSpinner();
 }
 
 // ============================================
@@ -1803,213 +2265,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
+    loadKPI();
     loadCommandes();
     loadAppels();
     loadVendeursForBilan();
-})
-// ============================================
-// KPI (Tableau de bord)
-// ============================================
-async function loadKPI() {
-    showSpinner();
-    try {
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-        
-        // Commandes du jour
-        const snapshotJour = await db.collection('commandes')
-            .where('dateCreation', '>=', today)
-            .get();
-        
-        // Commandes du mois
-        const snapshotMois = await db.collection('commandes')
-            .where('dateCreation', '>=', firstDay)
-            .get();
-        
-        // Vendeurs
-        const vendeurs = await db.collection('vendeurs').get();
-        
-        // Livreurs
-        const livreurs = await db.collection('livreurs').get();
-        
-        let total = 0, appeler = 0, livree = 0, ca = 0;
-        snapshotJour.forEach(doc => {
-            const data = doc.data();
-            total++;
-            if (data.statut === 'À appeler') appeler++;
-            if (data.statut === 'Livrée') livree++;
-            ca += data.prixTotal || 0;
-        });
-        
-        document.getElementById('kpiTotal').textContent = total;
-        document.getElementById('kpiAppeler').textContent = appeler;
-        document.getElementById('kpiLivree').textContent = livree;
-        document.getElementById('kpiCA').textContent = ca.toLocaleString();
-        document.getElementById('kpiVendeurs').textContent = vendeurs.size;
-        document.getElementById('kpiLivreurs').textContent = livreurs.size;
-        
-        // Taux de livraison
-        const txLivraison = total > 0 ? Math.round((livree / total) * 100) : 0;
-        document.getElementById('kpiTauxLivraison').textContent = txLivraison + '%';
-        
-        // Panier moyen
-        const moy = livree > 0 ? Math.round(ca / livree) : 0;
-        document.getElementById('kpiMoyenne').textContent = moy.toLocaleString();
-        
-        // Tendances (simulées)
-        document.getElementById('kpiTotalTrend').textContent = '▲ ' + (total > 0 ? Math.round(Math.random() * 20) : 0) + '%';
-        document.getElementById('kpiAppelerTrend').textContent = '▲ ' + (appeler > 0 ? Math.round(Math.random() * 15) : 0) + '%';
-        document.getElementById('kpiLivreeTrend').textContent = '▲ ' + (livree > 0 ? Math.round(Math.random() * 25) : 0) + '%';
-        document.getElementById('kpiCATrend').textContent = '▲ ' + (ca > 0 ? Math.round(Math.random() * 30) : 0) + '%';
-        
-    } catch (error) {
-        console.error('Erreur KPI:', error);
-    }
-    hideSpinner();
-}
-
-// ============================================
-// FILTRES
-// ============================================
-let filtreActif = 'all';
-
-function filtrerCommandes(statut) {
-    filtreActif = statut;
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.filter === statut);
-    });
-    loadCommandes();
-}
-
-// ============================================
-// OPTIMISATION DES TOURNÉES
-// ============================================
-async function optimiserTournees() {
-    showSpinner();
-    try {
-        const snapshot = await db.collection('commandes')
-            .where('statut', 'in', ['En-cours', 'À appeler'])
-            .get();
-        
-        if (snapshot.empty) {
-            document.getElementById('tourneesContainer').innerHTML = `
-                <p class="empty-message">Aucune commande en cours à optimiser.</p>
-            `;
-            hideSpinner();
-            return;
-        }
-        
-        // Simuler l'optimisation (tri par zone)
-        const commandes = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            commandes.push({ id: doc.id, ...data });
-        });
-        
-        // Trier par zone
-        const zones = ['Libreville', 'Akanda', 'Owendo', 'Bikélé'];
-        commandes.sort((a, b) => {
-            const idxA = zones.indexOf(a.zone);
-            const idxB = zones.indexOf(b.zone);
-            return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
-        });
-        
-        let html = `
-            <div class="bilan-result">
-                <h4>🗺️ Itinéraire optimisé</h4>
-                <p style="color:#6b7a8f;font-size:13px;">${commandes.length} commandes optimisées</p>
-                <div style="margin-top:12px;">
-        `;
-        commandes.forEach((cmd, index) => {
-            html += `
-                <div class="recap-item">
-                    <span>${index + 1}. ${cmd.numero}</span>
-                    <span>${cmd.zone || 'Non définie'}</span>
-                    <span style="color:#6b7a8f;font-size:12px;">${cmd.quartier}</span>
-                </div>
-            `;
-        });
-        html += '</div></div>';
-        document.getElementById('tourneesContainer').innerHTML = html;
-        
-        showToast('✅ Tournées optimisées avec succès !', 'success');
-    } catch (error) {
-        console.error('Erreur optimisation:', error);
-        showToast('❌ Erreur lors de l\'optimisation.', 'error');
-    }
-    hideSpinner();
-}
-
-// ============================================
-// ATTRIBUTION AUTOMATIQUE
-// ============================================
-async function attributionAuto() {
-    showSpinner();
-    try {
-        const livreursSnapshot = await db.collection('livreurs')
-            .where('actif', '==', true)
-            .get();
-        
-        if (livreursSnapshot.empty) {
-            showToast('⚠️ Aucun livreur actif.', 'error');
-            hideSpinner();
-            return;
-        }
-        
-        const livreurs = [];
-        livreursSnapshot.forEach(doc => {
-            livreurs.push({ id: doc.id, ...doc.data(), charge: 0 });
-        });
-        
-        const commandesSnapshot = await db.collection('commandes')
-            .where('statut', '==', 'À appeler')
-            .get();
-        
-        if (commandesSnapshot.empty) {
-            showToast('⚠️ Aucune commande à attribuer.', 'error');
-            hideSpinner();
-            return;
-        }
-        
-        let attribuees = 0;
-        for (const doc of commandesSnapshot.docs) {
-            const data = doc.data();
-            // Trouver le livreur le moins chargé
-            livreurs.sort((a, b) => a.charge - b.charge);
-            const livreur = livreurs[0];
-            
-            if (livreur && (livreur.charge < (livreur.capacite || 15))) {
-                await db.collection('commandes').doc(doc.id).update({
-                    livreurId: livreur.id,
-                    livreurNom: livreur.nom,
-                    statut: 'En-cours',
-                    dateAssignation: new Date()
-                });
-                livreur.charge++;
-                attribuees++;
-            }
-        }
-        
-        showToast(`✅ ${attribuees} commandes attribuées automatiquement !`, 'success');
-        loadCommandes();
-        loadAppels();
-        optimiserTournees();
-    } catch (error) {
-        console.error('Erreur attribution auto:', error);
-        showToast('❌ Erreur lors de l\'attribution.', 'error');
-    }
-    hideSpinner();
-}
-
-// ============================================
-// SPINNER
-// ============================================
-function showSpinner() {
-    document.getElementById('globalSpinner').classList.add('active');
-}
-
-function hideSpinner() {
-    document.getElementById('globalSpinner').classList.remove('active');
-}
-
+});
