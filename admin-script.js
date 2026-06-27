@@ -1,4 +1,4 @@
-// admin-script.js - Version complète avec corrections
+// admin-script.js - Version complète et corrigée
 
 // ========== SONS PERSONNALISÉS ==========
 let clickSound = null;
@@ -64,6 +64,7 @@ function showSection(section) {
     if (section === 'appels') loadAppels();
     if (section === 'kpi') loadKPI();
     if (section === 'commandes') loadCommandes();
+    if (section === 'tournees') optimiserTournees();
 }
 
 function logout() {
@@ -639,103 +640,450 @@ async function editLivreur(id) {
 
 // ========== STOCKAGE ==========
 async function loadStockage() {
-    // ... (code existant)
+    try {
+        const vendeurs = await db.collection('vendeurs').get();
+        const container = document.getElementById('stockageList');
+        const resume = document.getElementById('stockageResume');
+        const dettes = document.getElementById('stockageDettes');
+        if (vendeurs.empty) { container.innerHTML = '<p class="empty-message">Aucun vendeur.</p>'; return; }
+        let html = '<div class="list-container">', totalCasiers=0, totalDettes=0;
+        for (const doc of vendeurs.docs) {
+            const data = doc.data();
+            const s = await db.collection('stockage').where('vendeurId','==',doc.id).where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
+            let casiers=0, dette=0;
+            if (!s.empty) { const d=s.docs[0].data(); casiers=d.casiers||0; dette=d.dette||0; }
+            totalCasiers += casiers; totalDettes += dette;
+            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>Casiers: ${casiers} | Dette: ${dette} FCFA</small></div>
+                <div><button onclick="ajouterCasier('${doc.id}')" class="btn-edit">+</button>
+                <button onclick="retirerCasier('${doc.id}')" class="btn-delete">-</button></div></div>`;
+        }
+        html += '</div>'; container.innerHTML = html;
+        resume.innerHTML = `<div style="font-size:18px;font-weight:700;">${totalCasiers}</div><div style="color:#6b7a8f;">casiers</div>`;
+        dettes.innerHTML = `<div style="font-size:18px;font-weight:700;color:${totalDettes>0?'#c0392b':'#2d7d46'};">${totalDettes} FCFA</div><div style="color:#6b7a8f;">dette</div>`;
+    } catch(e) { console.error(e); }
+}
+
+async function ajouterCasier(vendeurId) {
+    const n = parseInt(prompt('Nombre de casiers à ajouter :')||'1');
+    if (isNaN(n)||n<=0) return;
+    try {
+        const s = await db.collection('stockage').where('vendeurId','==',vendeurId).where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
+        if (s.empty) {
+            await db.collection('stockage').add({ vendeurId, casiers: n, dette: n*5000, mois: new Date().getMonth()+1, annee: new Date().getFullYear() });
+        } else {
+            const doc = s.docs[0]; const data=doc.data();
+            const newCasiers=(data.casiers||0)+n;
+            await db.collection('stockage').doc(doc.id).update({ casiers: newCasiers, dette: newCasiers*5000 });
+        }
+        playSound('success');
+        showToast(`✅ ${n} casier(s) ajouté(s)`, 'success');
+        loadStockage();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
+}
+
+async function retirerCasier(vendeurId) {
+    try {
+        const s = await db.collection('stockage').where('vendeurId','==',vendeurId).where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
+        if (s.empty) { showToast('⚠️ Aucun casier.', 'error'); return; }
+        const doc=s.docs[0]; const data=doc.data();
+        const actuel=data.casiers||0;
+        if (actuel<=0) { showToast('⚠️ Aucun casier.', 'error'); return; }
+        const n=parseInt(prompt(`Casiers actuels: ${actuel}. Combien retirer ?`)||'1');
+        if (isNaN(n)||n<=0) return;
+        const nouveau=Math.max(0, actuel-n);
+        await db.collection('stockage').doc(doc.id).update({ casiers: nouveau, dette: nouveau*5000 });
+        playSound('success');
+        showToast(`✅ ${n} casier(s) retiré(s)`, 'success');
+        loadStockage();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
 async function activerPrelevements() {
     playSound('click');
-    // ... (code existant)
+    if (!confirm('Activer les prélèvements pour tous les vendeurs ?')) return;
+    try {
+        const s = await db.collection('stockage').where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
+        let count=0;
+        for(const doc of s.docs) { await db.collection('stockage').doc(doc.id).update({ prelevementsActifs: true, dateActivation: new Date() }); count++; }
+        playSound('success');
+        showToast(`✅ Prélèvements activés pour ${count} vendeur(s)`, 'success');
+        loadStockage();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
 async function appliquerPenalites() {
     playSound('click');
-    // ... (code existant)
+    if (!confirm('Appliquer les pénalités de 2.500 FCFA/jour ?')) return;
+    try {
+        const s = await db.collection('stockage').where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
+        let count=0;
+        for(const doc of s.docs) {
+            const data=doc.data();
+            if(data.dette>0) {
+                await db.collection('stockage').doc(doc.id).update({ dette: (data.dette||0)+2500, penalites: (data.penalites||0)+2500, dernierJourRetard: new Date() });
+                count++;
+            }
+        }
+        playSound('success');
+        showToast(`✅ Pénalités appliquées à ${count} vendeur(s)`, 'success');
+        loadStockage();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
 // ========== INSCRIPTIONS ==========
 async function loadInscriptions() {
-    // ... (code existant)
+    try {
+        const container = document.getElementById('inscriptionsList');
+        container.innerHTML = '<div class="spinner" style="margin:20px auto;"></div>';
+        
+        const snapshot = await db.collection('inscriptions')
+            .where('statut', '==', 'en_attente')
+            .orderBy('dateDemande', 'asc')
+            .get();
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<p class="empty-message">✅ Aucune demande en attente.</p>';
+            return;
+        }
+        
+        let html = '<div class="list-container">';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            html += `
+                <div class="list-item">
+                    <div>
+                        <strong>${data.nom || 'Inconnu'}</strong>
+                        <br><small>📞 ${data.telephone || 'N/A'} | ${data.role || 'N/A'}</small>
+                        ${data.boutique ? `<br><small>🏪 ${data.boutique}</small>` : ''}
+                        <br><small>📅 ${data.dateDemande ? new Date(data.dateDemande.seconds * 1000).toLocaleDateString() : 'N/A'}</small>
+                    </div>
+                    <div>
+                        <button onclick="accepterInscription('${doc.id}')" class="btn-success" style="padding:6px 12px;border:none;border-radius:6px;color:white;cursor:pointer;">✅</button>
+                        <button onclick="refuserInscription('${doc.id}')" class="btn-danger" style="padding:6px 12px;border:none;border-radius:6px;color:white;cursor:pointer;">❌</button>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Erreur inscriptions:', error);
+        document.getElementById('inscriptionsList').innerHTML = `
+            <p class="empty-message" style="color:#c0392b;">
+                ❌ Erreur : ${error.message}
+                <br><button onclick="loadInscriptions()" class="btn-secondary" style="margin-top:10px;padding:6px 14px;">🔄 Réessayer</button>
+            </p>
+        `;
+    }
 }
 
 async function accepterInscription(id) {
     playSound('click');
-    // ... (code existant)
+    if (!confirm('Accepter cette demande ?')) return;
+    
+    try {
+        const doc = await db.collection('inscriptions').doc(id).get();
+        const data = doc.data();
+        const code = await generateUniqueCode();
+        
+        await db.collection('inscriptions').doc(id).update({
+            statut: 'acceptée',
+            dateTraitement: new Date(),
+            codeSecret: code
+        });
+        
+        await db.collection('users').add({
+            nom: data.nom,
+            prenom: data.prenom || '',
+            telephone: data.telephone,
+            role: data.role,
+            code_secret: code,
+            boutique: data.boutique || '',
+            dateCreation: new Date()
+        });
+        
+        playSound('success');
+        showToast(`✅ Inscription acceptée ! Code: ${code}`, 'success');
+        loadInscriptions();
+        loadKPI();
+        
+    } catch (error) {
+        console.error('Erreur acceptation:', error);
+        showToast('❌ Erreur lors de l\'acceptation.', 'error');
+    }
 }
 
 async function refuserInscription(id) {
     playSound('click');
-    // ... (code existant)
+    const motif = prompt('Motif du refus :');
+    
+    try {
+        await db.collection('inscriptions').doc(id).update({
+            statut: 'refusée',
+            dateTraitement: new Date(),
+            motifRefus: motif || 'Non spécifié'
+        });
+        
+        playSound('success');
+        showToast('❌ Inscription refusée.', 'info');
+        loadInscriptions();
+        
+    } catch (error) {
+        console.error('Erreur refus:', error);
+        showToast('❌ Erreur lors du refus.', 'error');
+    }
 }
 
 // ========== BILAN ==========
 async function generateBilan() {
     playSound('click');
-    // ... (code existant)
+    const vendeur = document.getElementById('bilanVendeurSelect').value;
+    const container = document.getElementById('bilanContainer');
+    try {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+        let query = db.collection('commandes').where('dateCreation','>=',today).where('dateCreation','<',tomorrow);
+        if (vendeur !== 'all') query = query.where('vendeur','==',vendeur);
+        const snapshot = await query.get();
+        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune commande.</p>'; return; }
+        let totalVentes=0, totalFrais=0, livrees=0, details=[];
+        const stats = {'À appeler':0,'En-cours':0,'Livrée':0,'Indisponible':0,'Va rappeler':0,'Annulée':0,'Refusée':0,'Reportée':0};
+        let vendeurNom='';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            vendeurNom = data.vendeur||'Inconnu';
+            totalVentes += data.prixTotal||0;
+            totalFrais += data.fraisLivraison||0;
+            stats[data.statut] = (stats[data.statut]||0)+1;
+            if (data.statut === 'Livrée') livrees++;
+            details.push(`${data.numero} (${data.quartier||'?'}) : ${data.prixTotal} FCFA - ${data.statut}`);
+        });
+        const aEnvoyer = totalVentes - totalFrais;
+        let s = '';
+        for (const [k,v] of Object.entries(stats)) s += `<div><strong>${k} :</strong> ${v}</div>`;
+        container.innerHTML = `<div class="bilan-result"><h4>📊 Bilan - ${vendeurNom}</h4><div class="bilan-stats">${s}</div>
+            <div class="bilan-stats" style="border-top:1px solid #e2e8f0;padding-top:12px;margin-top:8px;">
+            <div><strong>💰 Total :</strong> ${totalVentes} FCFA</div><div><strong>🚚 Livraison :</strong> ${totalFrais} FCFA</div>
+            <div><strong>📤 À envoyer :</strong> ${aEnvoyer} FCFA</div><div><strong>✅ Livrées :</strong> ${livrees}/${snapshot.size}</div></div>
+            <div class="bilan-details"><strong>📦 Détail :</strong><br>${details.join('<br>')}</div></div>`;
+    } catch(e) { showToast('❌ Erreur bilan.', 'error'); }
 }
 
 async function copyBilan() {
     playSound('click');
-    // ... (code existant)
+    const vendeur = document.getElementById('bilanVendeurSelect').value;
+    try {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+        let query = db.collection('commandes').where('dateCreation','>=',today).where('dateCreation','<',tomorrow);
+        if (vendeur !== 'all') query = query.where('vendeur','==',vendeur);
+        const snapshot = await query.get();
+        if (snapshot.empty) { showToast('⚠️ Aucune commande.', 'error'); return; }
+        let totalVentes=0, totalFrais=0, vendeurNom='';
+        const stats={'À appeler':0,'En-cours':0,'Livrée':0,'Indisponible':0,'Va rappeler':0,'Annulée':0,'Refusée':0,'Reportée':0};
+        let details=[];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            vendeurNom = data.vendeur||'Inconnu';
+            totalVentes += data.prixTotal||0;
+            totalFrais += data.fraisLivraison||0;
+            stats[data.statut] = (stats[data.statut]||0)+1;
+            details.push(`${data.numero} (${data.quartier||'?'}) : ${data.prixTotal} FCFA - ${data.statut}`);
+        });
+        const aEnvoyer = totalVentes - totalFrais;
+        const dateStr = today.toLocaleDateString('fr-FR');
+        let text = `📊 BILAN DU ${dateStr} - ${vendeurNom}\n\n`;
+        text += `🔴 À appeler    : ${stats['À appeler']}\n🔴 En-cours     : ${stats['En-cours']}\n🔴 Livrée       : ${stats['Livrée']}\n`;
+        text += `🔴 Indisponible : ${stats['Indisponible']}\n🔴 Va rappeler  : ${stats['Va rappeler']}\n🔴 Annulée      : ${stats['Annulée']}\n`;
+        text += `🔴 Refusée      : ${stats['Refusée']}\n🔴 Reportée     : ${stats['Reportée']}\n\n`;
+        text += `💰 Montant total   : ${totalVentes} FCFA\n🚚 Livraison total : ${totalFrais} FCFA\n📤 À envoyer       : ${aEnvoyer} FCFA\n\n📦 Détail :\n${details.join('\n')}`;
+        await navigator.clipboard.writeText(text);
+        playSound('success');
+        showToast('✅ Bilan copié !', 'success');
+    } catch(e) { showToast('❌ Erreur copie.', 'error'); }
 }
 
 async function generatePDF() {
     playSound('click');
-    showToast('📄 Fonctionnalité PDF disponible prochainement.', 'info');
+    showToast('📄 Fonctionnalité PDF bientôt disponible.', 'info');
 }
 
 async function envoyerBilanWhatsApp() {
     playSound('click');
-    // ... (code existant)
+    const vendeur = document.getElementById('bilanVendeurSelect').value;
+    try {
+        const today = new Date(); today.setHours(0,0,0,0);
+        let query = db.collection('commandes').where('dateCreation','>=',today);
+        if (vendeur !== 'all') query = query.where('vendeur','==',vendeur);
+        const snapshot = await query.get();
+        if (snapshot.empty) { showToast('⚠️ Aucune commande.', 'error'); return; }
+        let total=0, vendeurNom='', details=[];
+        snapshot.forEach(doc => {
+            const data=doc.data();
+            vendeurNom=data.vendeur||'Inconnu';
+            total += data.prixTotal||0;
+            details.push(`${data.numero} : ${data.prixTotal} FCFA - ${data.statut}`);
+        });
+        const msg = `📊 BILAN DU ${today.toLocaleDateString('fr-FR')} - ${vendeurNom}\n\n💰 Total : ${total} FCFA\n\n📦 Détail :\n${details.join('\n')}`;
+        const phone = prompt('Numéro WhatsApp du vendeur :');
+        if (phone) { window.open(`https://wa.me/${phone.replace('+','')}?text=${encodeURIComponent(msg)}`, '_blank'); }
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
 async function generateMonthlyReport() {
     playSound('click');
-    // ... (code existant)
-}
-
-// ========== STOCK ==========
-async function openStockModal() {
-    playSound('click');
-    // ... (code existant)
-}
-
-function closeStockModal() {
-    playSound('click');
-    // ... (code existant)
-}
-
-async function consulterStock() {
-    playSound('click');
-    // ... (code existant)
-}
-
-function closeConsulterStockModal() {
-    playSound('click');
-    // ... (code existant)
-}
-
-async function rafraichirStock() {
-    // ... (code existant)
-}
-
-async function saveStock() {
-    // ... (code existant)
-}
-
-function addStockRow() {
-    playSound('click');
-    // ... (code existant)
+    showToast('📊 Rapport mensuel bientôt disponible.', 'info');
+    document.getElementById('monthlyReportContainer').innerHTML = '<div class="bilan-result"><h4>📈 Rapport mensuel</h4><p>Fonctionnalité en développement.</p></div>';
 }
 
 // ========== TOURNÉES ==========
 async function optimiserTournees() {
     playSound('click');
-    // ... (code existant)
+    showSpinner();
+    try {
+        const snapshot = await db.collection('commandes').where('statut','in',['En-cours','À appeler']).get();
+        const container = document.getElementById('tourneesContainer');
+        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune commande en cours.</p>'; hideSpinner(); return; }
+        const zones = ['Libreville','Akanda','Owendo','Bikélé'];
+        const cmds = []; snapshot.forEach(d => cmds.push({ id: d.id, ...d.data() }));
+        cmds.sort((a,b) => (zones.indexOf(a.zone)=== -1?999:zones.indexOf(a.zone)) - (zones.indexOf(b.zone)===-1?999:zones.indexOf(b.zone)));
+        let html = `<div class="bilan-result"><h4>🗺️ Itinéraire optimisé</h4><p style="color:#6b7a8f;">${cmds.length} commandes</p><div style="margin-top:12px;">`;
+        cmds.forEach((c,i) => { html += `<div class="recap-item"><span>${i+1}. ${c.numero}</span><span>${c.zone||'N/A'}</span><span style="font-size:12px;color:#6b7a8f;">${c.quartier}</span></div>`; });
+        html += '</div></div>';
+        container.innerHTML = html;
+        showToast('✅ Tournées optimisées !', 'success');
+    } catch(e) { showToast('❌ Erreur optimisation.', 'error'); }
+    hideSpinner();
 }
 
 async function attributionAuto() {
     playSound('click');
-    // ... (code existant)
+    showSpinner();
+    try {
+        const livreurs = await db.collection('livreurs').where('actif','==',true).get();
+        if (livreurs.empty) { showToast('⚠️ Aucun livreur actif.', 'error'); hideSpinner(); return; }
+        const list = []; livreurs.forEach(d => list.push({ id: d.id, ...d.data(), charge:0 }));
+        const cmds = await db.collection('commandes').where('statut','==','À appeler').get();
+        if (cmds.empty) { showToast('⚠️ Aucune commande à attribuer.', 'error'); hideSpinner(); return; }
+        let attribuees=0;
+        for (const doc of cmds.docs) {
+            list.sort((a,b) => a.charge - b.charge);
+            const l = list[0];
+            if (l && l.charge < (l.capacite||15)) {
+                await db.collection('commandes').doc(doc.id).update({ livreurId: l.id, livreurNom: l.nom, statut: 'En-cours', dateAssignation: new Date() });
+                l.charge++; attribuees++;
+            }
+        }
+        playSound('success');
+        showToast(`✅ ${attribuees} commandes attribuées !`, 'success');
+        loadCommandes(); loadAppels(); optimiserTournees(); loadKPI();
+    } catch(e) { showToast('❌ Erreur attribution.', 'error'); }
+    hideSpinner();
+}
+
+// ========== STOCK ==========
+async function openStockModal() {
+    playSound('click');
+    document.getElementById('stockModal').classList.add('active');
+    await loadVendeursForSelect('stockVendeurSelect');
+    document.getElementById('stockArticlesContainer').innerHTML = '';
+    addStockRow();
+}
+
+function closeStockModal() {
+    playSound('click');
+    document.getElementById('stockModal').classList.remove('active');
+}
+
+function addStockRow() {
+    playSound('click');
+    const container = document.getElementById('stockArticlesContainer');
+    const row = document.createElement('div');
+    row.className = 'article-row';
+    row.innerHTML = `<input type="text" class="stock-article-name" placeholder="Nom de l'article" /><input type="number" class="stock-article-qty" placeholder="Quantité" min="1" value="1" />`;
+    container.appendChild(row);
+}
+
+async function saveStock() {
+    const select = document.getElementById('stockVendeurSelect');
+    const vendeurId = select.value;
+    if (!vendeurId) { showToast('⚠️ Sélectionnez un vendeur.', 'error'); return; }
+    const rows = document.querySelectorAll('#stockArticlesContainer .article-row');
+    const articles = [];
+    rows.forEach(row => {
+        const name = row.querySelector('.stock-article-name').value.trim();
+        const qty = parseInt(row.querySelector('.stock-article-qty').value);
+        if (name && qty > 0) articles.push({ nom: name, quantite: qty });
+    });
+    if (articles.length === 0) { showToast('⚠️ Ajoutez au moins un article.', 'error'); return; }
+    try {
+        const vendeurDoc = await db.collection('vendeurs').doc(vendeurId).get();
+        const vendeurNom = vendeurDoc.data().nom;
+        for (const a of articles) {
+            const existing = await db.collection('stock').where('vendeurId','==',vendeurId).where('nom','==',a.nom).get();
+            if (existing.empty) { await db.collection('stock').add({ vendeurId, vendeurNom, nom: a.nom, quantite: a.quantite }); }
+            else { const doc = existing.docs[0]; await db.collection('stock').doc(doc.id).update({ quantite: (doc.data().quantite||0) + a.quantite }); }
+        }
+        playSound('success');
+        showToast(`✅ Stock ajouté pour ${vendeurNom} !`, 'success');
+        closeStockModal();
+        loadStockage();
+    } catch(e) { console.error(e); showToast('❌ Erreur stockage.', 'error'); }
+}
+
+async function consulterStock() {
+    playSound('click');
+    document.getElementById('consulterStockModal').classList.add('active');
+    await rafraichirStock();
+}
+
+function closeConsulterStockModal() {
+    playSound('click');
+    document.getElementById('consulterStockModal').classList.remove('active');
+}
+
+async function rafraichirStock() {
+    try {
+        const snapshot = await db.collection('stock').get();
+        const container = document.getElementById('stockListContainer');
+        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucun stock enregistré.</p>'; return; }
+        let html = '<div class="list-container">';
+        const vendeurs = {};
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (!vendeurs[data.vendeurId]) vendeurs[data.vendeurId] = { nom: data.vendeurNom || 'Inconnu', articles: [] };
+            vendeurs[data.vendeurId].articles.push({ id: doc.id, nom: data.nom, quantite: data.quantite || 0 });
+        });
+        for (const [vid, v] of Object.entries(vendeurs)) {
+            html += `<div style="font-weight:700;padding:8px 0;border-top:1px solid #e2e8f0;">🏪 ${v.nom}</div>`;
+            v.articles.forEach(a => {
+                html += `<div class="list-item"><div><strong>${a.nom}</strong><br><small>${a.quantite} unités</small></div>
+                    <div><button onclick="retirerStock('${a.id}')" class="btn-delete">➖ Retirer</button></div></div>`;
+            });
+        }
+        html += '</div>';
+        container.innerHTML = html;
+    } catch(e) { console.error(e); }
+}
+
+async function retirerStock(id) {
+    const qty = prompt('Quantité à retirer :');
+    if (!qty) return;
+    const num = parseInt(qty);
+    if (isNaN(num) || num <= 0) { showToast('⚠️ Quantité invalide.', 'error'); return; }
+    try {
+        const doc = await db.collection('stock').doc(id).get();
+        const data = doc.data();
+        const newQty = (data.quantite || 0) - num;
+        if (newQty < 0) { showToast('⚠️ Stock insuffisant.', 'error'); return; }
+        if (newQty === 0) { await db.collection('stock').doc(id).delete(); }
+        else { await db.collection('stock').doc(id).update({ quantite: newQty }); }
+        playSound('success');
+        showToast('✅ Stock retiré avec succès !', 'success');
+        await rafraichirStock();
+        loadStockage();
+    } catch(e) { console.error(e); showToast('❌ Erreur retrait.', 'error'); }
 }
 
 // ========== UTILITAIRES ==========
@@ -784,7 +1132,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadAppels();
     loadVendeursForBilan();
 
-    // Fermer la modale en cliquant sur le fond
+    // Fermer les modales en cliquant sur le fond
     document.getElementById('commandeModal').addEventListener('click', function(e) {
         if (e.target === this) closeCommandeModal();
     });
