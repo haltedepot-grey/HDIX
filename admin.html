@@ -4,8 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>HDIX - Admin</title>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
     <link rel="manifest" href="manifest.json" />
-    <link rel="apple-touch-icon" href="assets/icon-192.png" />
+    <link rel="icon" href="assets/favicon.ico" />
+
     <meta name="theme-color" content="#1a2b4c" />
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -15,9 +21,19 @@
 <body>
 <div class="app-container">
 
+    <!-- EN-TÊTE AVEC LOGO -->
     <header class="admin-header">
-        <div class="header-left"><h1>HDIX</h1><span class="badge">Admin</span></div>
-        <div class="header-right"><span id="adminName">Admin</span><button onclick="logout()" class="btn-logout">Déconnexion</button></div>
+        <div class="header-left">
+            <div class="header-logo">
+                <img src="assets/logo.png" alt="HDIX" />
+                <h1>HDIX</h1>
+            </div>
+            <span class="badge">Admin</span>
+        </div>
+        <div class="header-right">
+            <span id="adminName">Admin</span>
+            <button onclick="logout()" class="btn-logout">Déconnexion</button>
+        </div>
     </header>
 
     <!-- NAVIGATION -->
@@ -43,6 +59,7 @@
             </div>
         </div>
         <button class="nav-btn" onclick="showSection('inscriptions')">📝 Inscriptions</button>
+        <button class="nav-btn" onclick="window.location.href='tresorerie.html'">💰 Trésorerie</button>
     </div>
 
     <!-- SECTION KPI -->
@@ -120,8 +137,7 @@
         <button onclick="appliquerPenalites()" class="btn-danger" style="margin:12px 0;">⚠️ Appliquer pénalités</button>
         <div id="stockageList"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
-
-    <!-- SECTION BILAN -->
+        <!-- SECTION BILAN -->
     <div id="section-bilan" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📊 Bilan</h3><button onclick="loadVendeursForBilan()" class="refresh-btn">🔄</button></div>
         <div class="bilan-section">
@@ -154,6 +170,8 @@
     </div>
 
 </div>
+
+<!-- ========== MODALES ========== -->
 
 <!-- MODALE NOUVELLE COMMANDE -->
 <div class="modal" id="commandeModal">

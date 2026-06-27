@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>HDIX - Trésorerie</title>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="assets/favicon.ico" />
+
+    <meta name="theme-color" content="#1a2b4c" />
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+        .tresorerie-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 16px 0;
+        }
+        .tresorerie-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .tresorerie-card .solde {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2d7d46;
+        }
+        .tresorerie-card .solde.negatif {
+            color: #c0392b;
+        }
+        .tresorerie-card .label {
+            font-size: 14px;
+            color: #6b7a8f;
+        }
+        .tresorerie-card .airtel-btn {
+            display: inline-block;
+            background: #f7931a;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            margin-top: 8px;
+            cursor: pointer;
+            border: none;
+        }
+        .tresorerie-card .airtel-btn:hover {
+            background: #e0851a;
+        }
+        .tresorerie-actions {
+            display: flex;
+            gap: 12px;
+            margin: 16px 0;
+            flex-wrap: wrap;
+        }
+        .tresorerie-actions button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-depot {
+            background: #2d7d46;
+            color: white;
+        }
+        .btn-depot:hover {
+            background: #3a8d56;
+        }
+        .btn-retrait {
+            background: #c0392b;
+            color: white;
+        }
+        .btn-retrait:hover {
+            background: #a93226;
+        }
+        .btn-airtel {
+            background: #f7931a;
+            color: white;
+        }
+        .btn-airtel:hover {
+            background: #e0851a;
+        }
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f0f2f5;
+        }
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
+        .transaction-item .montant-depot {
+            color: #2d7d46;
+            font-weight: 700;
+        }
+        .transaction-item .montant-retrait {
+            color: #c0392b;
+            font-weight: 700;
+        }
+        .transaction-item .type {
+            font-size: 12px;
+            padding: 2px 10px;
+            border-radius: 12px;
+        }
+        .type-depot {
+            background: #eafaf1;
+            color: #1a7a42;
+        }
+        .type-retrait {
+            background: #fdedec;
+            color: #922b21;
+        }
+        .type-airtel {
+            background: #fef9e7;
+            color: #7d6608;
+        }
+        .filter-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .filter-btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            background: #f1f3f5;
+            color: #4a5568;
+        }
+        .filter-btn.active {
+            background: #1a2b4c;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+
+    <header class="admin-header">
+        <div class="header-left">
+            <div class="header-logo">
+                <img src="assets/logo.png" alt="HDIX" />
+                <h1>HDIX</h1>
+            </div>
+            <span class="badge">Trésorerie</span>
+        </div>
+        <div class="header-right">
+            <span id="adminName">Admin</span>
+            <button onclick="logout()" class="btn-logout">Déconnexion</button>
+        </div>
+    </header>
+
+    <!-- Navigation Admin -->
+    <div class="admin-nav">
+        <button class="nav-btn" onclick="window.location.href='admin.html'">📦 Admin</button>
+        <button class="nav-btn active" onclick="loadTresorerie()">💰 Trésorerie</button>
+    </div>
+
+    <!-- SOLDE ET AIRTEL -->
+    <div class="tresorerie-grid">
+        <div class="tresorerie-card">
+            <div class="label">💰 Solde disponible</div>
+            <div class="solde" id="soldeDisplay">0 FCFA</div>
+        </div>
+        <div class="tresorerie-card">
+            <div class="label">📱 Airtel Money</div>
+            <div id="airtelDisplay">+241 66 12 34 56</div>
+            <button onclick="ouvrirAirtel()" class="airtel-btn">📲 Envoyer vers Airtel</button>
+        </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="tresorerie-actions">
+        <button onclick="openDepotModal()" class="btn-depot">📥 Dépôt</button>
+        <button onclick="openRetraitModal()" class="btn-retrait">📤 Retrait</button>
+        <button onclick="exporterTransactions()" class="btn-airtel" style="background:#8e44ad;">📊 Export</button>
+    </div>
+
+    <!-- FILTRES -->
+    <div class="filter-buttons">
+        <button onclick="filtrerTransactions('toutes')" class="filter-btn active" data-filter="toutes">📋 Toutes</button>
+        <button onclick="filtrerTransactions('depot')" class="filter-btn" data-filter="depot" style="background:#eafaf1;">📥 Dépôts</button>
+        <button onclick="filtrerTransactions('retrait')" class="filter-btn" data-filter="retrait" style="background:#fdedec;">📤 Retraits</button>
+        <button onclick="filtrerTransactions('airtel')" class="filter-btn" data-filter="airtel" style="background:#fef9e7;">📱 Airtel</button>
+    </div>
+
+    <!-- HISTORIQUE -->
+    <div class="commandes-list">
+        <h3>📋 Historique des transactions</h3>
+        <div id="transactionsContainer">
+            <div class="spinner" style="margin:30px auto;"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- MODALE DÉPÔT -->
+<div class="modal" id="depotModal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeDepotModal()">✕</button>
+        <div class="step-title">📥 NOUVEAU DÉPÔT</div>
+        <div class="form-group">
+            <label>Montant (FCFA)</label>
+            <input type="number" id="depotMontant" placeholder="Ex: 25000" min="0" />
+        </div>
+        <div class="form-group">
+            <label>Mode de paiement</label>
+            <select id="depotMode">
+                <option value="especes">Espèces</option>
+                <option value="airtel_money">Airtel Money</option>
+                <option value="virement">Virement bancaire</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Description (optionnel)</label>
+            <input type="text" id="depotDescription" placeholder="Ex: Dépôt de Marie Cosmetics" />
+        </div>
+        <button onclick="enregistrerDepot()" class="btn-primary btn-success">✅ Enregistrer</button>
+    </div>
+</div>
+
+<!-- MODALE RETRAIT -->
+<div class="modal" id="retraitModal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeRetraitModal()">✕</button>
+        <div class="step-title">📤 NOUVEAU RETRAIT</div>
+        <div class="form-group">
+            <label>Montant (FCFA)</label>
+            <input type="number" id="retraitMontant" placeholder="Ex: 15000" min="0" />
+        </div>
+        <div class="form-group">
+            <label>Mode de retrait</label>
+            <select id="retraitMode">
+                <option value="especes">Espèces</option>
+                <option value="airtel_money">Airtel Money</option>
+                <option value="virement">Virement bancaire</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Description (optionnel)</label>
+            <input type="text" id="retraitDescription" placeholder="Ex: Retrait pour livreur" />
+        </div>
+        <button onclick="enregistrerRetrait()" class="btn-primary btn-danger">📤 Retirer</button>
+    </div>
+</div>
+
+<script src="firebase-config.js"></script>
+<script src="tresorerie-script.js"></script>
+</body>
+</html>

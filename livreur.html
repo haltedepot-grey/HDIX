@@ -4,8 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>HDIX - Livreur</title>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
     <link rel="manifest" href="manifest.json" />
-    <link rel="apple-touch-icon" href="assets/icon-192.png" />
+    <link rel="icon" href="assets/favicon.ico" />
+
     <meta name="theme-color" content="#1a2b4c" />
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -16,18 +22,25 @@
 <div class="app-container">
 
     <header class="admin-header">
-        <div class="header-left"><h1>HDIX</h1><span class="badge">Livreur</span></div>
-        <div class="header-right"><span id="livreurName">Livreur</span><button onclick="logoutL()" class="btn-logout">Déconnexion</button></div>
+        <div class="header-left">
+            <div class="header-logo">
+                <img src="assets/logo.png" alt="HDIX" />
+                <h1>HDIX</h1>
+            </div>
+            <span class="badge">Livreur</span>
+        </div>
+        <div class="header-right">
+            <span id="livreurName">Livreur</span>
+            <button onclick="logoutL()" class="btn-logout">Déconnexion</button>
+        </div>
     </header>
 
-    <!-- Infos livreur -->
     <div class="livreur-card">
         <div><strong>Nom :</strong> <span id="livreurNom">Chargement...</span></div>
         <div><strong>Zone :</strong> <span id="livreurZone">-</span></div>
         <div><strong>Statut :</strong> <span class="badge" id="livreurStatut">Disponible</span></div>
     </div>
 
-    <!-- Carte géolocalisation -->
     <div id="mapContainer">
         <div id="map" class="map-placeholder">
             🗺️ Position en temps réel<br>
@@ -35,13 +48,11 @@
         </div>
     </div>
 
-    <!-- Mes commandes -->
     <h3 style="margin-top:24px;">📦 Mes commandes</h3>
     <div id="commandesLivreurContainer">
         <p class="empty-message">Aucune commande assignée.</p>
     </div>
 
-    <!-- Journal -->
     <div style="margin-top:24px;">
         <h4>📋 Journal</h4>
         <div id="logContainer" class="log">

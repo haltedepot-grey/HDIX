@@ -4,8 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>HDIX - Vendeur</title>
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
     <link rel="manifest" href="manifest.json" />
-    <link rel="apple-touch-icon" href="assets/icon-192.png" />
+    <link rel="icon" href="assets/favicon.ico" />
+
     <meta name="theme-color" content="#1a2b4c" />
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -16,8 +22,17 @@
 <div class="app-container">
 
     <header class="admin-header">
-        <div class="header-left"><h1>HDIX</h1><span class="badge">Vendeur</span></div>
-        <div class="header-right"><span id="vendeurName">Vendeur</span><button onclick="logoutV()" class="btn-logout">Déconnexion</button></div>
+        <div class="header-left">
+            <div class="header-logo">
+                <img src="assets/logo.png" alt="HDIX" />
+                <h1>HDIX</h1>
+            </div>
+            <span class="badge">Vendeur</span>
+        </div>
+        <div class="header-right">
+            <span id="vendeurName">Vendeur</span>
+            <button onclick="logoutV()" class="btn-logout">Déconnexion</button>
+        </div>
     </header>
 
     <!-- NOUVELLE COMMANDE -->
@@ -78,6 +93,7 @@
             <button class="toggle-option" id="toggleCollageV" onclick="switchModeV('collage')">📋 Coller</button>
         </div>
         <div id="modeSaisieV">
+            <div class="form-group"><label>Téléphone client *</label><input type="tel" id="commandeTelephoneV" placeholder="+241 66 12 34 56" /></div>
             <div id="articlesContainerV"><div class="article-row"><input type="number" class="article-qty" placeholder="Qté" min="1" value="1" /><input type="text" class="article-name" placeholder="Nom de l'article" /></div></div>
             <button onclick="addArticleRowV()" class="add-article-btn">+ Ajouter un autre article</button>
             <div class="form-group"><label>Prix total (FCFA)</label><input type="number" id="commandePrixV" placeholder="Ex: 12000" min="0" /></div>

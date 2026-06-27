@@ -1465,3 +1465,21 @@ textarea:focus {
 .vendeur-select-row select:focus {
     border-color: var(--primary);
 }
+/* ========== LOGO DANS L'EN-TÊTE ========== */
+.header-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-logo img {
+    height: 36px;
+    width: auto;
+    object-fit: contain;
+}
+
+.header-logo h1 {
+    font-size: 24px;
+    color: #1a2b4c;
+    margin: 0;
+}
