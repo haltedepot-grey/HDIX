@@ -1,4 +1,4 @@
-// admin-script.js - Version complète et corrigée
+// admin-script.js - Version complète et finale
 
 // ========== SONS PERSONNALISÉS ==========
 let clickSound = null;
@@ -730,37 +730,63 @@ async function appliquerPenalites() {
     } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
-// ========== INSCRIPTIONS ==========
+// ========== INSCRIPTIONS (HISTORIQUE + FILTRES + CODE) ==========
 async function loadInscriptions() {
     try {
         const container = document.getElementById('inscriptionsList');
         container.innerHTML = '<div class="spinner" style="margin:20px auto;"></div>';
         
         const snapshot = await db.collection('inscriptions')
-            .where('statut', '==', 'en_attente')
-            .orderBy('dateDemande', 'asc')
+            .orderBy('dateDemande', 'desc')
             .get();
         
         if (snapshot.empty) {
-            container.innerHTML = '<p class="empty-message">✅ Aucune demande en attente.</p>';
+            container.innerHTML = '<p class="empty-message">Aucune demande d\'inscription.</p>';
             return;
         }
         
-        let html = '<div class="list-container">';
+        let html = `
+            <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
+                <button onclick="filtrerInscriptions('toutes')" class="filter-btn active" data-filter="toutes">📋 Toutes</button>
+                <button onclick="filtrerInscriptions('en_attente')" class="filter-btn" data-filter="en_attente" style="background:#fef9e7;">⏳ En attente</button>
+                <button onclick="filtrerInscriptions('acceptée')" class="filter-btn" data-filter="acceptée" style="background:#eafaf1;">✅ Acceptées</button>
+                <button onclick="filtrerInscriptions('refusée')" class="filter-btn" data-filter="refusée" style="background:#fdedec;">❌ Refusées</button>
+            </div>
+            <div id="inscriptionsListContainer">
+        `;
+        
         snapshot.forEach(doc => {
             const data = doc.data();
+            const statut = data.statut || 'en_attente';
+            const statutClass = statut === 'acceptée' ? 'statut-livree' : 
+                               statut === 'refusée' ? 'statut-indisponible' : 'statut-appel';
+            const statutLabel = statut === 'acceptée' ? '✅ Acceptée' : 
+                               statut === 'refusée' ? '❌ Refusée' : '⏳ En attente';
+            
+            const code = statut === 'acceptée' && data.codeSecret ? data.codeSecret : '';
+            const telephone = data.telephone || '';
+            
             html += `
-                <div class="list-item">
-                    <div>
-                        <strong>${data.nom || 'Inconnu'}</strong>
-                        <br><small>📞 ${data.telephone || 'N/A'} | ${data.role || 'N/A'}</small>
-                        ${data.boutique ? `<br><small>🏪 ${data.boutique}</small>` : ''}
-                        <br><small>📅 ${data.dateDemande ? new Date(data.dateDemande.seconds * 1000).toLocaleDateString() : 'N/A'}</small>
-                    </div>
-                    <div>
-                        <button onclick="accepterInscription('${doc.id}')" class="btn-success" style="padding:6px 12px;border:none;border-radius:6px;color:white;cursor:pointer;">✅</button>
-                        <button onclick="refuserInscription('${doc.id}')" class="btn-danger" style="padding:6px 12px;border:none;border-radius:6px;color:white;cursor:pointer;">❌</button>
-                    </div>
+                <div class="commande-item inscription-item" data-statut="${statut}">
+                    <span class="numero">${data.nom || 'Inconnu'}</span>
+                    <span class="vendeur">📞 ${telephone}</span>
+                    <span class="localisation">${data.role || 'N/A'}</span>
+                    ${code ? `
+                        <span class="montant" style="color:#8e44ad;font-weight:700;">🔑 ${code}</span>
+                        <span class="actions" style="display:flex;gap:4px;flex-shrink:0;">
+                            <button onclick="copierCode('${code}')" title="Copier le code" style="background:#e2e8f0;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;">📋</button>
+                            <button onclick="envoyerCodeWhatsApp('${code}', '${telephone}', '${data.nom || ''}')" title="Envoyer par WhatsApp" style="background:#25D366;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;color:white;font-size:12px;">💬</button>
+                        </span>
+                    ` : ''}
+                    <span class="statut ${statutClass}">${statutLabel}</span>
+                    <span class="actions">
+                        ${statut === 'en_attente' ? `
+                            <button onclick="accepterInscription('${doc.id}')" class="btn-success" style="padding:4px 8px;border:none;border-radius:4px;color:white;cursor:pointer;font-size:12px;">✅</button>
+                            <button onclick="refuserInscription('${doc.id}')" class="btn-danger" style="padding:4px 8px;border:none;border-radius:4px;color:white;cursor:pointer;font-size:12px;">❌</button>
+                        ` : `
+                            <span style="color:#6b7a8f;font-size:11px;">✓</span>
+                        `}
+                    </span>
                 </div>
             `;
         });
@@ -778,61 +804,56 @@ async function loadInscriptions() {
     }
 }
 
-async function accepterInscription(id) {
+// ========== COPIER / PARTAGER CODE ==========
+
+function copierCode(code) {
     playSound('click');
-    if (!confirm('Accepter cette demande ?')) return;
-    
-    try {
-        const doc = await db.collection('inscriptions').doc(id).get();
-        const data = doc.data();
-        const code = await generateUniqueCode();
-        
-        await db.collection('inscriptions').doc(id).update({
-            statut: 'acceptée',
-            dateTraitement: new Date(),
-            codeSecret: code
-        });
-        
-        await db.collection('users').add({
-            nom: data.nom,
-            prenom: data.prenom || '',
-            telephone: data.telephone,
-            role: data.role,
-            code_secret: code,
-            boutique: data.boutique || '',
-            dateCreation: new Date()
-        });
-        
+    navigator.clipboard.writeText(code).then(() => {
         playSound('success');
-        showToast(`✅ Inscription acceptée ! Code: ${code}`, 'success');
-        loadInscriptions();
-        loadKPI();
-        
-    } catch (error) {
-        console.error('Erreur acceptation:', error);
-        showToast('❌ Erreur lors de l\'acceptation.', 'error');
-    }
+        showToast(`✅ Code "${code}" copié dans le presse-papiers !`, 'success');
+    }).catch(() => {
+        const textarea = document.createElement('textarea');
+        textarea.value = code;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast(`✅ Code "${code}" copié !`, 'success');
+    });
 }
 
-async function refuserInscription(id) {
+function envoyerCodeWhatsApp(code, telephone, nom) {
     playSound('click');
-    const motif = prompt('Motif du refus :');
-    
-    try {
-        await db.collection('inscriptions').doc(id).update({
-            statut: 'refusée',
-            dateTraitement: new Date(),
-            motifRefus: motif || 'Non spécifié'
-        });
-        
-        playSound('success');
-        showToast('❌ Inscription refusée.', 'info');
-        loadInscriptions();
-        
-    } catch (error) {
-        console.error('Erreur refus:', error);
-        showToast('❌ Erreur lors du refus.', 'error');
+    if (!telephone) {
+        showToast('⚠️ Numéro de téléphone manquant.', 'error');
+        return;
     }
+    
+    const phone = telephone.replace(/[^0-9+]/g, '');
+    const message = `Bonjour ${nom || 'cher(e) client(e)'},\n\nVotre compte HDIX a été activé.\n\n🔑 Votre code secret : ${code}\n\n📱 Lien de connexion : https://hdix.netlify.app\n\nMerci de votre confiance ! 🚀`;
+    
+    const url = `https://wa.me/${phone.replace('+', '')}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+    showToast('💬 Ouverture de WhatsApp...', 'info');
+}
+
+// ========== FILTRE INSCRIPTIONS ==========
+let filtreInscriptions = 'toutes';
+
+function filtrerInscriptions(statut) {
+    playSound('click');
+    filtreInscriptions = statut;
+    document.querySelectorAll('#inscriptionsList .filter-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.filter === statut);
+    });
+    
+    document.querySelectorAll('.inscription-item').forEach(el => {
+        if (statut === 'toutes') {
+            el.style.display = 'flex';
+        } else {
+            el.style.display = el.dataset.statut === statut ? 'flex' : 'none';
+        }
+    });
 }
 
 // ========== BILAN ==========
