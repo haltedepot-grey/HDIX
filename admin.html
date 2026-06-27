@@ -20,9 +20,8 @@
         <div class="header-right"><span id="adminName">Admin</span><button onclick="logout()" class="btn-logout">Déconnexion</button></div>
     </header>
 
-    <!-- ========== NAVIGATION ADMIN (4 GROUPES) ========== -->
+    <!-- NAVIGATION -->
     <div class="admin-nav">
-        <!-- Groupe 1 : Commandes -->
         <div class="nav-group">
             <button class="nav-btn active" onclick="showSection('commandes')">📦 Commandes</button>
             <div class="nav-sub">
@@ -30,8 +29,6 @@
                 <button class="nav-btn" onclick="showSection('tournees')">🗺️ Tournées</button>
             </div>
         </div>
-
-        <!-- Groupe 2 : Gestion -->
         <div class="nav-group">
             <button class="nav-btn" onclick="showSection('vendeurs')">👤 Vendeurs</button>
             <div class="nav-sub">
@@ -39,16 +36,12 @@
                 <button class="nav-btn" onclick="showSection('stockage')">📦 Stockage</button>
             </div>
         </div>
-
-        <!-- Groupe 3 : Rapports -->
         <div class="nav-group">
             <button class="nav-btn" onclick="showSection('bilan')">📊 Bilan</button>
             <div class="nav-sub">
                 <button class="nav-btn" onclick="showSection('kpi')">📈 KPI</button>
             </div>
         </div>
-
-        <!-- Groupe 4 : Admin -->
         <button class="nav-btn" onclick="showSection('inscriptions')">📝 Inscriptions</button>
     </div>
 
@@ -75,24 +68,20 @@
             <h3>📋 Commandes</h3>
             <button onclick="loadCommandes()" class="refresh-btn">🔄</button>
         </div>
-
         <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 16px 0;gap:12px;flex-wrap:wrap;">
             <button onclick="openCommandeModal()" class="btn-create" style="flex:1;min-width:200px;">✨ Nouvelle commande</button>
         </div>
-
         <div class="filter-buttons">
             <button onclick="filtrerCommandes('all')" class="filter-btn active" data-filter="all">📋 Toutes</button>
             <button onclick="filtrerCommandes('À appeler')" class="filter-btn" data-filter="À appeler" style="background:#fef9e7;">📞 À appeler</button>
             <button onclick="filtrerCommandes('En-cours')" class="filter-btn" data-filter="En-cours" style="background:#ebf5fb;">🔄 En-cours</button>
             <button onclick="filtrerCommandes('Livrée')" class="filter-btn" data-filter="Livrée" style="background:#eafaf1;">✅ Livrée</button>
         </div>
-
         <div class="stats-grid">
             <div class="stat-card"><span class="stat-number" id="statAppeler">0</span><span class="stat-label">À appeler</span></div>
             <div class="stat-card"><span class="stat-number" id="statLivree">0</span><span class="stat-label">Livrées</span></div>
             <div class="stat-card"><span class="stat-number" id="statTotal">0</span><span class="stat-label">Total</span></div>
         </div>
-
         <div class="commandes-list"><div id="commandesContainer"><div class="spinner" style="margin:30px auto;"></div></div></div>
     </div>
 
@@ -177,6 +166,7 @@
         </div>
         <div id="modeSaisie">
             <div class="vendeur-select-row"><label>Vendeur</label><select id="commandeVendeurSelect"><option value="">-- Sélectionnez --</option></select></div>
+            <div class="form-group"><label>Téléphone client *</label><input type="tel" id="commandeTelephone" placeholder="+241 66 12 34 56" /></div>
             <div id="articlesContainer"><div class="article-row"><input type="number" class="article-qty" placeholder="Qté" min="1" value="1" /><input type="text" class="article-name" placeholder="Nom de l'article" /></div></div>
             <button onclick="addArticleRow()" class="add-article-btn">+ Ajouter un autre article</button>
             <div class="form-group"><label>Prix total (FCFA)</label><input type="number" id="commandePrix" placeholder="Ex: 12000" min="0" /></div>
@@ -221,6 +211,16 @@
         </div>
         <div id="stockListContainer"><p class="empty-message">Chargement du stock...</p></div>
         <button onclick="closeConsulterStockModal()" class="btn-primary" style="margin-top:12px;">⬅️ Retour</button>
+    </div>
+</div>
+
+<!-- MODALE DÉTAIL COMMANDE -->
+<div class="modal" id="detailCommandeModal">
+    <div class="modal-content" style="max-width:500px;">
+        <button class="modal-close" onclick="closeDetailCommandeModal()">✕</button>
+        <div id="detailCommandeContent">
+            <div class="spinner" style="margin:20px auto;"></div>
+        </div>
     </div>
 </div>
 

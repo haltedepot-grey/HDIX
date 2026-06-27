@@ -1,4 +1,4 @@
-// admin-script.js - Version complète et finale
+// admin-script.js - Version complète avec formatage, téléphone client et modale
 
 // ========== SONS PERSONNALISÉS ==========
 let clickSound = null;
@@ -50,6 +50,12 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
+// ========== FORMATAGE DES NOMBRES ==========
+function formatNumber(num) {
+    if (num === undefined || num === null) return '0';
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
 // ========== NAVIGATION ==========
 function showSection(section) {
     playSound('click');
@@ -93,13 +99,13 @@ async function loadKPI() {
         document.getElementById('kpiTotal').textContent = total;
         document.getElementById('kpiAppeler').textContent = appeler;
         document.getElementById('kpiLivree').textContent = livree;
-        document.getElementById('kpiCA').textContent = ca.toLocaleString();
+        document.getElementById('kpiCA').textContent = formatNumber(ca);
         document.getElementById('kpiVendeurs').textContent = vendeurs.size;
         document.getElementById('kpiLivreurs').textContent = livreurs.size;
         const tx = total > 0 ? Math.round((livree / total) * 100) : 0;
         document.getElementById('kpiTauxLivraison').textContent = tx + '%';
         const moy = livree > 0 ? Math.round(ca / livree) : 0;
-        document.getElementById('kpiMoyenne').textContent = moy.toLocaleString();
+        document.getElementById('kpiMoyenne').textContent = formatNumber(moy);
         document.getElementById('kpiTotalTrend').textContent = '▲ ' + (total > 0 ? Math.round(Math.random()*20) : 0) + '%';
         document.getElementById('kpiAppelerTrend').textContent = '▲ ' + (appeler > 0 ? Math.round(Math.random()*15) : 0) + '%';
         document.getElementById('kpiLivreeTrend').textContent = '▲ ' + (livree > 0 ? Math.round(Math.random()*25) : 0) + '%';
@@ -134,7 +140,7 @@ async function loadCommandes() {
                 <span class="numero">${data.numero||'N/A'}</span>
                 <span class="localisation">📍 ${data.quartier||''}, ${data.ville||''}</span>
                 <span class="vendeur">${data.vendeur||'N/A'}</span>
-                <span class="montant">${data.prixTotal||0} FCFA</span>
+                <span class="montant">${formatNumber(data.prixTotal||0)} FCFA</span>
                 <span class="statut ${sc}">${data.statut||'N/A'}</span>
                 <span class="actions">
                     <button onclick="event.stopPropagation(); modifierCommande('${doc.id}')" title="Modifier">✏️</button>
@@ -161,7 +167,6 @@ function filtrerCommandes(statut) {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === statut));
     loadCommandes();
 }
-
 // ========== MODALE NOUVELLE COMMANDE ==========
 async function openCommandeModal(commandeId) {
     playSound('click');
@@ -182,6 +187,7 @@ function closeCommandeModal() {
 function resetCommandeForm() {
     document.getElementById('articlesContainer').innerHTML = '';
     addArticleRow();
+    document.getElementById('commandeTelephone').value = '';
     document.getElementById('commandePrix').value = '';
     document.getElementById('commandeFraisInclus').checked = true;
     document.getElementById('commandeZone').value = '';
@@ -229,6 +235,8 @@ async function saveCommande() {
     const vendeurId = select.value;
     if (!vendeurId) { showToast('⚠️ Sélectionnez un vendeur.', 'error'); return; }
     const vendeurNom = select.options[select.selectedIndex].textContent;
+    const telephone = document.getElementById('commandeTelephone').value.trim();
+    if (!telephone) { showToast('⚠️ Veuillez saisir le téléphone du client.', 'error'); return; }
     const rows = document.querySelectorAll('#articlesContainer .article-row');
     const articles = [];
     rows.forEach(row => {
@@ -249,7 +257,7 @@ async function saveCommande() {
     const fraisLivraison = fraisInclus ? 0 : (zones[zone] || 0);
 
     const data = {
-        articles, prixTotal: prix, fraisInclus, fraisLivraison, zone, quartier, ville, note,
+        articles, prixTotal: prix, fraisInclus, fraisLivraison, zone, quartier, ville, note, telephone,
         vendeurId, vendeur: vendeurNom, statut: 'À appeler', dateCreation: new Date(), admin: 'Admin'
     };
 
@@ -335,7 +343,6 @@ function analyserTexte(text) {
     if (!result.vendeur) { result.vendeur = prompt('Vendeur pour cette commande :') || ''; }
     return result;
 }
-
 // ========== APPELS ==========
 let fileAppel = [];
 let indexAppel = 0;
@@ -349,7 +356,7 @@ async function loadAppels() {
         snapshot.forEach(doc => {
             const data = doc.data();
             html += `<div class="commande-item"><span class="numero">${data.numero}</span><span class="vendeur">${data.vendeur}</span>
-                <span class="montant">${data.prixTotal} FCFA</span><span class="statut statut-appel">${data.statut}</span></div>`;
+                <span class="montant">${formatNumber(data.prixTotal)} FCFA</span><span class="statut statut-appel">${data.statut}</span></div>`;
         });
         container.innerHTML = html;
     } catch(e) { console.error(e); }
@@ -386,7 +393,7 @@ function afficherAppel() {
         <div class="recap-item"><span>Vendeur</span><span>${data.vendeur}</span></div>
         <div class="recap-item"><span>Articles</span><span>${articles}</span></div>
         <div class="recap-item"><span>Lieu</span><span>${data.quartier}, ${data.ville}</span></div>
-        <div class="recap-item"><span>Montant</span><span>${data.prixTotal} FCFA</span></div>
+        <div class="recap-item"><span>Montant</span><span>${formatNumber(data.prixTotal)} FCFA</span></div>
         <div style="margin:16px 0;display:flex;gap:10px;flex-wrap:wrap;">
             <button onclick="appelerClient('${item.id}')" class="btn-primary" style="flex:1;">📞 Appeler</button>
             <button onclick="whatsappClient('${item.id}')" class="btn-primary" style="flex:1;background:#25D366;">💬 WhatsApp</button>
@@ -418,6 +425,10 @@ function appelerClient(id) {
     playSound('click');
     db.collection('commandes').doc(id).get().then(doc => {
         const data = doc.data();
+        const phone = data.telephone || prompt('Numéro du client :');
+        if (phone) {
+            window.location.href = `tel:${phone.replace(/[^0-9+]/g, '')}`;
+        }
         showToast('📞 Appel en cours...', 'info');
         setTimeout(() => {
             if (confirm('Le client a-t-il répondu ?')) { validerAppel(id, 'Validé'); }
@@ -430,9 +441,9 @@ function whatsappClient(id) {
     playSound('click');
     db.collection('commandes').doc(id).get().then(doc => {
         const data = doc.data();
-        const phone = prompt('Numéro WhatsApp du client :');
+        const phone = data.telephone || prompt('Numéro WhatsApp du client :');
         if (phone) {
-            window.open(`https://wa.me/${phone.replace('+','')}?text=Bonjour, nous vous confirmons votre livraison (${data.numero}).`, '_blank');
+            window.open(`https://wa.me/${phone.replace(/[^0-9+]/g, '').replace('+', '')}?text=Bonjour, nous vous confirmons votre livraison (${data.numero}).`, '_blank');
         }
     });
 }
@@ -441,27 +452,84 @@ function smsClient(id) {
     playSound('click');
     db.collection('commandes').doc(id).get().then(doc => {
         const data = doc.data();
-        const phone = prompt('Numéro du client :');
+        const phone = data.telephone || prompt('Numéro du client :');
         if (phone) {
             const lien = `https://hdix.netlify.app/confirmation/${id}`;
             const msg = `📦 Commande ${data.numero}\nConfirmez : OK -> ${lien}/ok | Appelez-moi -> ${lien}/appel | Indisponible -> ${lien}/non`;
-            window.open(`https://wa.me/${phone.replace('+','')}?text=${encodeURIComponent(msg)}`, '_blank');
+            window.open(`https://wa.me/${phone.replace(/[^0-9+]/g, '').replace('+', '')}?text=${encodeURIComponent(msg)}`, '_blank');
         }
     });
 }
 
-// ========== COMMANDES CRUD ==========
+// ========== MODALE DÉTAIL COMMANDE ==========
 async function afficherCommande(id) {
     playSound('click');
     try {
         const doc = await db.collection('commandes').doc(id).get();
         const data = doc.data();
-        if (!data) { showToast('⚠️ Commande non trouvée.', 'error'); return; }
-        const articles = data.articles ? data.articles.map(a => `${a.quantite} x ${a.nom}`).join('\n') : 'Aucun';
-        alert(`📋 COMMANDE ${data.numero||'N/A'}\n\nVendeur: ${data.vendeur||'N/A'}\n📦 Articles:\n${articles}\n💰 ${data.prixTotal||0} FCFA\n📍 ${data.quartier||''}, ${data.ville||''}\n📌 ${data.statut||'N/A'}\n📝 ${data.note||'Aucune'}`);
-    } catch(e) { showToast('❌ Erreur affichage.', 'error'); }
+        if (!data) {
+            showToast('⚠️ Commande non trouvée.', 'error');
+            return;
+        }
+
+        const modal = document.getElementById('detailCommandeModal');
+        const content = document.getElementById('detailCommandeContent');
+
+        let articlesHtml = '';
+        if (data.articles && data.articles.length > 0) {
+            data.articles.forEach(a => {
+                articlesHtml += `<div class="recap-item"><span>${a.quantite} x ${a.nom}</span></div>`;
+            });
+        } else {
+            articlesHtml = '<span style="color:#6b7a8f;">Aucun article</span>';
+        }
+
+        const prix = formatNumber(data.prixTotal || 0);
+        const frais = formatNumber(data.fraisLivraison || 0);
+
+        content.innerHTML = `
+            <div class="step-title">📋 ${data.numero || 'N/A'}</div>
+            <div style="margin-top:8px;">
+                <div class="recap-item"><span>Vendeur</span><span><strong>${data.vendeur || 'N/A'}</strong></span></div>
+                <div class="recap-item"><span>📞 Téléphone client</span><span><strong>${data.telephone || 'Non renseigné'}</strong></span></div>
+                <div class="recap-item"><span>Articles</span></div>
+                <div style="padding:4px 0 8px 16px;">${articlesHtml}</div>
+                <div class="recap-item"><span>💰 Montant</span><span><strong>${prix} FCFA</strong></span></div>
+                <div class="recap-item"><span>🚚 Frais livraison</span><span><strong>${frais} FCFA</strong></span></div>
+                <div class="recap-item"><span>📍 Lieu</span><span><strong>${data.quartier || ''}, ${data.ville || ''}</strong></span></div>
+                <div class="recap-item"><span>📌 Statut</span><span><span class="statut ${data.statut === 'Livrée' ? 'statut-livree' : data.statut === 'À appeler' ? 'statut-appel' : 'statut-attente'}">${data.statut || 'N/A'}</span></span></div>
+                ${data.note ? `<div class="recap-item"><span>📝 Note</span><span>${data.note}</span></div>` : ''}
+                <div style="margin-top:12px;border-top:1px solid #e2e8f0;padding-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <button onclick="closeDetailCommandeModal(); modifierCommande('${id}')" class="btn-primary" style="flex:1;padding:8px;">✏️ Modifier</button>
+                    ${data.telephone ? `<button onclick="appelerClientDepuisCommande('${data.telephone}')" class="btn-primary" style="flex:1;padding:8px;background:#25D366;">📞 Appeler</button>` : ''}
+                    <button onclick="closeDetailCommandeModal()" class="btn-secondary" style="flex:1;padding:8px;">Fermer</button>
+                </div>
+            </div>
+        `;
+
+        modal.classList.add('active');
+
+    } catch(e) {
+        console.error(e);
+        showToast('❌ Erreur affichage.', 'error');
+    }
 }
 
+function closeDetailCommandeModal() {
+    document.getElementById('detailCommandeModal').classList.remove('active');
+}
+
+function appelerClientDepuisCommande(telephone) {
+    playSound('click');
+    const phone = telephone.replace(/[^0-9+]/g, '');
+    if (phone) {
+        window.location.href = `tel:${phone}`;
+    } else {
+        showToast('⚠️ Numéro invalide.', 'error');
+    }
+}
+
+// ========== COMMANDES CRUD ==========
 async function modifierCommande(id) {
     playSound('click');
     await openCommandeModal(id);
@@ -497,7 +565,6 @@ async function assignerCommande(commandeId) {
         loadCommandes(); loadAppels(); loadKPI();
     } catch(e) { showToast('❌ Erreur assignation.', 'error'); }
 }
-
 // ========== VENDEURS ==========
 async function loadVendeurs() {
     try {
@@ -505,12 +572,15 @@ async function loadVendeurs() {
         const container = document.getElementById('vendeursList');
         if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucun vendeur.</p>'; return; }
         let html = '<div class="list-container">';
-        snapshot.forEach(doc => {
+        for (const doc of snapshot.docs) {
             const data = doc.data();
-            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>📞 ${data.telephone} | ${data.abreviation||'N/A'}</small></div>
+            const userSnap = await db.collection('users').where('vendeurId','==',doc.id).get();
+            let code = 'N/A';
+            if (!userSnap.empty) { code = userSnap.docs[0].data().code_secret || 'N/A'; }
+            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>📞 ${data.telephone} | ${data.abreviation||'N/A'} | 🔑 ${code}</small></div>
                 <div><button onclick="editVendeur('${doc.id}')" class="btn-edit">✏️</button>
                 <button onclick="deleteVendeur('${doc.id}')" class="btn-delete">🗑️</button></div></div>`;
-        });
+        }
         html += '</div>';
         container.innerHTML = html;
     } catch(e) { console.error(e); }
@@ -573,12 +643,15 @@ async function loadLivreurs() {
         const container = document.getElementById('livreursList');
         if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucun livreur.</p>'; return; }
         let html = '<div class="list-container">';
-        snapshot.forEach(doc => {
+        for (const doc of snapshot.docs) {
             const data = doc.data();
-            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>📞 ${data.telephone} | ${data.zone||'N/A'} | ${data.actif?'✅ Actif':'⛔ Inactif'}</small></div>
+            const userSnap = await db.collection('users').where('livreurId','==',doc.id).get();
+            let code = 'N/A';
+            if (!userSnap.empty) { code = userSnap.docs[0].data().code_secret || 'N/A'; }
+            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>📞 ${data.telephone} | ${data.zone||'N/A'} | 🔑 ${code}</small></div>
                 <div><button onclick="editLivreur('${doc.id}')" class="btn-edit">✏️</button>
                 <button onclick="deleteLivreur('${doc.id}')" class="btn-delete">🗑️</button></div></div>`;
-        });
+        }
         html += '</div>';
         container.innerHTML = html;
     } catch(e) { console.error(e); }
@@ -653,13 +726,13 @@ async function loadStockage() {
             let casiers=0, dette=0;
             if (!s.empty) { const d=s.docs[0].data(); casiers=d.casiers||0; dette=d.dette||0; }
             totalCasiers += casiers; totalDettes += dette;
-            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>Casiers: ${casiers} | Dette: ${dette} FCFA</small></div>
+            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>Casiers: ${casiers} | Dette: ${formatNumber(dette)} FCFA</small></div>
                 <div><button onclick="ajouterCasier('${doc.id}')" class="btn-edit">+</button>
                 <button onclick="retirerCasier('${doc.id}')" class="btn-delete">-</button></div></div>`;
         }
         html += '</div>'; container.innerHTML = html;
         resume.innerHTML = `<div style="font-size:18px;font-weight:700;">${totalCasiers}</div><div style="color:#6b7a8f;">casiers</div>`;
-        dettes.innerHTML = `<div style="font-size:18px;font-weight:700;color:${totalDettes>0?'#c0392b':'#2d7d46'};">${totalDettes} FCFA</div><div style="color:#6b7a8f;">dette</div>`;
+        dettes.innerHTML = `<div style="font-size:18px;font-weight:700;color:${totalDettes>0?'#c0392b':'#2d7d46'};">${formatNumber(totalDettes)} FCFA</div><div style="color:#6b7a8f;">dette</div>`;
     } catch(e) { console.error(e); }
 }
 
@@ -729,22 +802,21 @@ async function appliquerPenalites() {
         loadStockage();
     } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
-
-// ========== INSCRIPTIONS (HISTORIQUE + FILTRES + CODE) ==========
+// ========== INSCRIPTIONS ==========
 async function loadInscriptions() {
     try {
         const container = document.getElementById('inscriptionsList');
         container.innerHTML = '<div class="spinner" style="margin:20px auto;"></div>';
-        
+
         const snapshot = await db.collection('inscriptions')
             .orderBy('dateDemande', 'desc')
             .get();
-        
+
         if (snapshot.empty) {
             container.innerHTML = '<p class="empty-message">Aucune demande d\'inscription.</p>';
             return;
         }
-        
+
         let html = `
             <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
                 <button onclick="filtrerInscriptions('toutes')" class="filter-btn active" data-filter="toutes">📋 Toutes</button>
@@ -754,7 +826,7 @@ async function loadInscriptions() {
             </div>
             <div id="inscriptionsListContainer">
         `;
-        
+
         snapshot.forEach(doc => {
             const data = doc.data();
             const statut = data.statut || 'en_attente';
@@ -762,10 +834,10 @@ async function loadInscriptions() {
                                statut === 'refusée' ? 'statut-indisponible' : 'statut-appel';
             const statutLabel = statut === 'acceptée' ? '✅ Acceptée' : 
                                statut === 'refusée' ? '❌ Refusée' : '⏳ En attente';
-            
+
             const code = statut === 'acceptée' && data.codeSecret ? data.codeSecret : '';
             const telephone = data.telephone || '';
-            
+
             html += `
                 <div class="commande-item inscription-item" data-statut="${statut}">
                     <span class="numero">${data.nom || 'Inconnu'}</span>
@@ -792,7 +864,7 @@ async function loadInscriptions() {
         });
         html += '</div>';
         container.innerHTML = html;
-        
+
     } catch (error) {
         console.error('Erreur inscriptions:', error);
         document.getElementById('inscriptionsList').innerHTML = `
@@ -803,8 +875,6 @@ async function loadInscriptions() {
         `;
     }
 }
-
-// ========== COPIER / PARTAGER CODE ==========
 
 function copierCode(code) {
     playSound('click');
@@ -828,16 +898,15 @@ function envoyerCodeWhatsApp(code, telephone, nom) {
         showToast('⚠️ Numéro de téléphone manquant.', 'error');
         return;
     }
-    
+
     const phone = telephone.replace(/[^0-9+]/g, '');
     const message = `Bonjour ${nom || 'cher(e) client(e)'},\n\nVotre compte HDIX a été activé.\n\n🔑 Votre code secret : ${code}\n\n📱 Lien de connexion : https://hdix.netlify.app\n\nMerci de votre confiance ! 🚀`;
-    
+
     const url = `https://wa.me/${phone.replace('+', '')}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
     showToast('💬 Ouverture de WhatsApp...', 'info');
 }
 
-// ========== FILTRE INSCRIPTIONS ==========
 let filtreInscriptions = 'toutes';
 
 function filtrerInscriptions(statut) {
@@ -846,7 +915,7 @@ function filtrerInscriptions(statut) {
     document.querySelectorAll('#inscriptionsList .filter-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.filter === statut);
     });
-    
+
     document.querySelectorAll('.inscription-item').forEach(el => {
         if (statut === 'toutes') {
             el.style.display = 'flex';
@@ -854,6 +923,63 @@ function filtrerInscriptions(statut) {
             el.style.display = el.dataset.statut === statut ? 'flex' : 'none';
         }
     });
+}
+
+async function accepterInscription(id) {
+    playSound('click');
+    if (!confirm('Accepter cette demande ?')) return;
+
+    try {
+        const doc = await db.collection('inscriptions').doc(id).get();
+        const data = doc.data();
+        const code = await generateUniqueCode();
+
+        await db.collection('inscriptions').doc(id).update({
+            statut: 'acceptée',
+            dateTraitement: new Date(),
+            codeSecret: code
+        });
+
+        await db.collection('users').add({
+            nom: data.nom,
+            prenom: data.prenom || '',
+            telephone: data.telephone,
+            role: data.role,
+            code_secret: code,
+            boutique: data.boutique || '',
+            dateCreation: new Date()
+        });
+
+        playSound('success');
+        showToast(`✅ Inscription acceptée ! Code: ${code}`, 'success');
+        loadInscriptions();
+        loadKPI();
+
+    } catch (error) {
+        console.error('Erreur acceptation:', error);
+        showToast('❌ Erreur lors de l\'acceptation.', 'error');
+    }
+}
+
+async function refuserInscription(id) {
+    playSound('click');
+    const motif = prompt('Motif du refus :');
+
+    try {
+        await db.collection('inscriptions').doc(id).update({
+            statut: 'refusée',
+            dateTraitement: new Date(),
+            motifRefus: motif || 'Non spécifié'
+        });
+
+        playSound('success');
+        showToast('❌ Inscription refusée.', 'info');
+        loadInscriptions();
+
+    } catch (error) {
+        console.error('Erreur refus:', error);
+        showToast('❌ Erreur lors du refus.', 'error');
+    }
 }
 
 // ========== BILAN ==========
@@ -878,15 +1004,15 @@ async function generateBilan() {
             totalFrais += data.fraisLivraison||0;
             stats[data.statut] = (stats[data.statut]||0)+1;
             if (data.statut === 'Livrée') livrees++;
-            details.push(`${data.numero} (${data.quartier||'?'}) : ${data.prixTotal} FCFA - ${data.statut}`);
+            details.push(`${data.numero} (${data.quartier||'?'}) : ${formatNumber(data.prixTotal)} FCFA - ${data.statut}`);
         });
         const aEnvoyer = totalVentes - totalFrais;
         let s = '';
         for (const [k,v] of Object.entries(stats)) s += `<div><strong>${k} :</strong> ${v}</div>`;
         container.innerHTML = `<div class="bilan-result"><h4>📊 Bilan - ${vendeurNom}</h4><div class="bilan-stats">${s}</div>
             <div class="bilan-stats" style="border-top:1px solid #e2e8f0;padding-top:12px;margin-top:8px;">
-            <div><strong>💰 Total :</strong> ${totalVentes} FCFA</div><div><strong>🚚 Livraison :</strong> ${totalFrais} FCFA</div>
-            <div><strong>📤 À envoyer :</strong> ${aEnvoyer} FCFA</div><div><strong>✅ Livrées :</strong> ${livrees}/${snapshot.size}</div></div>
+            <div><strong>💰 Total :</strong> ${formatNumber(totalVentes)} FCFA</div><div><strong>🚚 Livraison :</strong> ${formatNumber(totalFrais)} FCFA</div>
+            <div><strong>📤 À envoyer :</strong> ${formatNumber(aEnvoyer)} FCFA</div><div><strong>✅ Livrées :</strong> ${livrees}/${snapshot.size}</div></div>
             <div class="bilan-details"><strong>📦 Détail :</strong><br>${details.join('<br>')}</div></div>`;
     } catch(e) { showToast('❌ Erreur bilan.', 'error'); }
 }
@@ -910,7 +1036,7 @@ async function copyBilan() {
             totalVentes += data.prixTotal||0;
             totalFrais += data.fraisLivraison||0;
             stats[data.statut] = (stats[data.statut]||0)+1;
-            details.push(`${data.numero} (${data.quartier||'?'}) : ${data.prixTotal} FCFA - ${data.statut}`);
+            details.push(`${data.numero} (${data.quartier||'?'}) : ${formatNumber(data.prixTotal)} FCFA - ${data.statut}`);
         });
         const aEnvoyer = totalVentes - totalFrais;
         const dateStr = today.toLocaleDateString('fr-FR');
@@ -918,13 +1044,13 @@ async function copyBilan() {
         text += `🔴 À appeler    : ${stats['À appeler']}\n🔴 En-cours     : ${stats['En-cours']}\n🔴 Livrée       : ${stats['Livrée']}\n`;
         text += `🔴 Indisponible : ${stats['Indisponible']}\n🔴 Va rappeler  : ${stats['Va rappeler']}\n🔴 Annulée      : ${stats['Annulée']}\n`;
         text += `🔴 Refusée      : ${stats['Refusée']}\n🔴 Reportée     : ${stats['Reportée']}\n\n`;
-        text += `💰 Montant total   : ${totalVentes} FCFA\n🚚 Livraison total : ${totalFrais} FCFA\n📤 À envoyer       : ${aEnvoyer} FCFA\n\n📦 Détail :\n${details.join('\n')}`;
+        text += `💰 Montant total   : ${formatNumber(totalVentes)} FCFA\n🚚 Livraison total : ${formatNumber(totalFrais)} FCFA\n📤 À envoyer       : ${formatNumber(aEnvoyer)} FCFA\n\n📦 Détail :\n${details.join('\n')}`;
         await navigator.clipboard.writeText(text);
         playSound('success');
         showToast('✅ Bilan copié !', 'success');
     } catch(e) { showToast('❌ Erreur copie.', 'error'); }
 }
-
+// ========== BILAN (suite) ==========
 async function generatePDF() {
     playSound('click');
     showToast('📄 Fonctionnalité PDF bientôt disponible.', 'info');
@@ -944,9 +1070,9 @@ async function envoyerBilanWhatsApp() {
             const data=doc.data();
             vendeurNom=data.vendeur||'Inconnu';
             total += data.prixTotal||0;
-            details.push(`${data.numero} : ${data.prixTotal} FCFA - ${data.statut}`);
+            details.push(`${data.numero} : ${formatNumber(data.prixTotal)} FCFA - ${data.statut}`);
         });
-        const msg = `📊 BILAN DU ${today.toLocaleDateString('fr-FR')} - ${vendeurNom}\n\n💰 Total : ${total} FCFA\n\n📦 Détail :\n${details.join('\n')}`;
+        const msg = `📊 BILAN DU ${today.toLocaleDateString('fr-FR')} - ${vendeurNom}\n\n💰 Total : ${formatNumber(total)} FCFA\n\n📦 Détail :\n${details.join('\n')}`;
         const phone = prompt('Numéro WhatsApp du vendeur :');
         if (phone) { window.open(`https://wa.me/${phone.replace('+','')}?text=${encodeURIComponent(msg)}`, '_blank'); }
     } catch(e) { showToast('❌ Erreur.', 'error'); }
@@ -1165,5 +1291,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     document.getElementById('appelModal').addEventListener('click', function(e) {
         if (e.target === this) fermerAppelModal();
+    });
+    document.getElementById('detailCommandeModal').addEventListener('click', function(e) {
+        if (e.target === this) closeDetailCommandeModal();
     });
 });
