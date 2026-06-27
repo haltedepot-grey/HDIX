@@ -20,21 +20,40 @@
         <div class="header-right"><span id="adminName">Admin</span><button onclick="logout()" class="btn-logout">Déconnexion</button></div>
     </header>
 
-    <!-- NAVIGATION -->
+    <!-- ========== NAVIGATION ADMIN (4 GROUPES) ========== -->
     <div class="admin-nav">
-        <button class="nav-btn active" onclick="showSection('commandes')">📦 Commandes</button>
-        <button class="nav-btn" onclick="showSection('vendeurs')">👤 Vendeurs</button>
-        <button class="nav-btn" onclick="showSection('livreurs')">🚚 Livreurs</button>
-        <button class="nav-btn" onclick="showSection('stockage')">📦 Stockage</button>
-        <button class="nav-btn" onclick="showSection('bilan')">📊 Bilan</button>
+        <!-- Groupe 1 : Commandes -->
+        <div class="nav-group">
+            <button class="nav-btn active" onclick="showSection('commandes')">📦 Commandes</button>
+            <div class="nav-sub">
+                <button class="nav-btn" onclick="showSection('appels')">📞 Appels</button>
+                <button class="nav-btn" onclick="showSection('tournees')">🗺️ Tournées</button>
+            </div>
+        </div>
+
+        <!-- Groupe 2 : Gestion -->
+        <div class="nav-group">
+            <button class="nav-btn" onclick="showSection('vendeurs')">👤 Vendeurs</button>
+            <div class="nav-sub">
+                <button class="nav-btn" onclick="showSection('livreurs')">🚚 Livreurs</button>
+                <button class="nav-btn" onclick="showSection('stockage')">📦 Stockage</button>
+            </div>
+        </div>
+
+        <!-- Groupe 3 : Rapports -->
+        <div class="nav-group">
+            <button class="nav-btn" onclick="showSection('bilan')">📊 Bilan</button>
+            <div class="nav-sub">
+                <button class="nav-btn" onclick="showSection('kpi')">📈 KPI</button>
+            </div>
+        </div>
+
+        <!-- Groupe 4 : Admin -->
         <button class="nav-btn" onclick="showSection('inscriptions')">📝 Inscriptions</button>
-        <button class="nav-btn" onclick="showSection('kpi')">📊 KPI</button>
-        <button class="nav-btn" onclick="showSection('appels')">📞 Appels</button>
-        <button class="nav-btn" onclick="showSection('tournees')">🗺️ Tournées</button>
     </div>
 
     <!-- SECTION KPI -->
-    <div id="section-kpi" class="section active">
+    <div id="section-kpi" class="section" style="display:none;">
         <h3 style="display:flex;justify-content:space-between;align-items:center;">📊 KPI <button onclick="loadKPI()" class="refresh-btn">🔄</button></h3>
         <div class="kpi-grid">
             <div class="kpi-card"><div class="number" id="kpiTotal">0</div><div class="label">Total commandes</div><div class="trend trend-up" id="kpiTotalTrend">▲ 0%</div></div>
@@ -51,13 +70,12 @@
     </div>
 
     <!-- SECTION COMMANDES -->
-    <div id="section-commandes" class="section" style="display:none;">
+    <div id="section-commandes" class="section active">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
             <h3>📋 Commandes</h3>
             <button onclick="loadCommandes()" class="refresh-btn">🔄</button>
         </div>
 
-        <!-- BOUTON NOUVELLE COMMANDE CORRIGÉ -->
         <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 16px 0;gap:12px;flex-wrap:wrap;">
             <button onclick="openCommandeModal()" class="btn-create" style="flex:1;min-width:200px;">✨ Nouvelle commande</button>
         </div>
@@ -158,55 +176,19 @@
             <button class="toggle-option" id="toggleCollage" onclick="switchMode('collage')">📋 Coller</button>
         </div>
         <div id="modeSaisie">
-            <div class="vendeur-select-row">
-                <label>Vendeur</label>
-                <select id="commandeVendeurSelect">
-                    <option value="">-- Sélectionnez --</option>
-                </select>
-            </div>
-            <div id="articlesContainer">
-                <div class="article-row">
-                    <input type="number" class="article-qty" placeholder="Qté" min="1" value="1" />
-                    <input type="text" class="article-name" placeholder="Nom de l'article" />
-                </div>
-            </div>
+            <div class="vendeur-select-row"><label>Vendeur</label><select id="commandeVendeurSelect"><option value="">-- Sélectionnez --</option></select></div>
+            <div id="articlesContainer"><div class="article-row"><input type="number" class="article-qty" placeholder="Qté" min="1" value="1" /><input type="text" class="article-name" placeholder="Nom de l'article" /></div></div>
             <button onclick="addArticleRow()" class="add-article-btn">+ Ajouter un autre article</button>
-            <div class="form-group">
-                <label>Prix total (FCFA)</label>
-                <input type="number" id="commandePrix" placeholder="Ex: 12000" min="0" />
-            </div>
-            <div class="form-group">
-                <label><input type="checkbox" id="commandeFraisInclus" checked /> Frais de livraison inclus</label>
-            </div>
-            <div class="form-group">
-                <label>Zone</label>
-                <select id="commandeZone">
-                    <option value="">Sélectionnez</option>
-                    <option value="Libreville">Libreville : 2.000 FCFA</option>
-                    <option value="Akanda">Akanda : 3.000 FCFA</option>
-                    <option value="Owendo">Owendo : 3.000 FCFA</option>
-                    <option value="Bikélé">Bikélé : 3.000 FCFA</option>
-                    <option value="Autres">Autres</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Quartier</label>
-                <input type="text" id="commandeQuartier" placeholder="Ex: Batterie IV" />
-            </div>
-            <div class="form-group">
-                <label>Ville</label>
-                <input type="text" id="commandeVille" placeholder="Ex: Libreville" />
-            </div>
-            <div class="form-group">
-                <label>Note</label>
-                <textarea id="commandeNote" rows="2" placeholder="Sonner 3 fois..."></textarea>
-            </div>
+            <div class="form-group"><label>Prix total (FCFA)</label><input type="number" id="commandePrix" placeholder="Ex: 12000" min="0" /></div>
+            <div class="form-group"><label><input type="checkbox" id="commandeFraisInclus" checked /> Frais de livraison inclus</label></div>
+            <div class="form-group"><label>Zone</label><select id="commandeZone"><option value="">Sélectionnez</option><option value="Libreville">Libreville : 2.000 FCFA</option><option value="Akanda">Akanda : 3.000 FCFA</option><option value="Owendo">Owendo : 3.000 FCFA</option><option value="Bikélé">Bikélé : 3.000 FCFA</option><option value="Autres">Autres</option></select></div>
+            <div class="form-group"><label>Quartier</label><input type="text" id="commandeQuartier" placeholder="Ex: Batterie IV" /></div>
+            <div class="form-group"><label>Ville</label><input type="text" id="commandeVille" placeholder="Ex: Libreville" /></div>
+            <div class="form-group"><label>Note</label><textarea id="commandeNote" rows="2" placeholder="Sonner 3 fois..."></textarea></div>
             <button onclick="saveCommande()" class="btn-primary btn-success" style="width:100%;padding:12px;">✅ Enregistrer</button>
         </div>
         <div id="modeCollage" style="display:none;">
-            <div class="collage-zone">
-                <textarea id="collageInput" rows="6" placeholder="Collez le bon de commande ici..."></textarea>
-            </div>
+            <div class="collage-zone"><textarea id="collageInput" rows="6" placeholder="Collez le bon de commande ici..."></textarea></div>
             <button onclick="analyserCollage()" class="btn-collage" style="width:100%;padding:12px;">🔍 Analyser</button>
             <div id="collageResult" style="margin-top:16px;"></div>
         </div>
@@ -218,18 +200,8 @@
     <div class="modal-content">
         <button class="modal-close" onclick="closeStockModal()">✕</button>
         <div class="step-title">📦 AJOUTER STOCK</div>
-        <div class="vendeur-select-row">
-            <label>Vendeur</label>
-            <select id="stockVendeurSelect">
-                <option value="">-- Sélectionnez --</option>
-            </select>
-        </div>
-        <div id="stockArticlesContainer">
-            <div class="article-row">
-                <input type="text" class="stock-article-name" placeholder="Nom de l'article" />
-                <input type="number" class="stock-article-qty" placeholder="Quantité" min="1" value="1" />
-            </div>
-        </div>
+        <div class="vendeur-select-row"><label>Vendeur</label><select id="stockVendeurSelect"><option value="">-- Sélectionnez --</option></select></div>
+        <div id="stockArticlesContainer"><div class="article-row"><input type="text" class="stock-article-name" placeholder="Nom de l'article" /><input type="number" class="stock-article-qty" placeholder="Quantité" min="1" value="1" /></div></div>
         <button onclick="addStockRow()" class="add-article-btn">+ Ajouter un autre article</button>
         <div style="display:flex;gap:10px;margin-top:16px;">
             <button onclick="consulterStock()" class="btn-secondary" style="flex:1;">📦 Consulter stock</button>
