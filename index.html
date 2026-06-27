@@ -104,6 +104,29 @@
             from { transform: translateX(-50%) translateY(40px); opacity: 0; }
             to { transform: translateX(-50%) translateY(0); opacity: 1; }
         }
+        .input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .input-group input {
+            flex: 1;
+            padding-right: 50px;
+        }
+        .input-group .toggle-btn {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 8px;
+            color: #6b7a8f;
+            transition: color 0.2s;
+        }
+        .input-group .toggle-btn:hover {
+            color: #1a2b4c;
+        }
     </style>
 </head>
 <body>
@@ -119,7 +142,10 @@
                 <p class="info-text">Saisissez votre code secret à 8 caractères</p>
 
                 <div class="form-group">
-                    <input type="password" id="codeSecret" placeholder="Code secret" maxlength="8" autocomplete="off" />
+                    <div class="input-group">
+                        <input type="password" id="codeSecret" placeholder="Code secret" maxlength="8" autocomplete="off" />
+                        <button onclick="toggleCodeVisibility()" class="toggle-btn" id="toggleCodeBtn">👁️</button>
+                    </div>
                 </div>
 
                 <button onclick="login()" class="btn-primary">Se connecter</button>
@@ -227,6 +253,27 @@
             }, 4000);
         }
 
+        // ========== VOIR/CACHER CODE ==========
+        let codeVisible = false;
+
+        function toggleCodeVisibility() {
+            const input = document.getElementById('codeSecret');
+            const btn = document.getElementById('toggleCodeBtn');
+            codeVisible = !codeVisible;
+
+            if (codeVisible) {
+                input.type = 'text';
+                btn.textContent = '🙈';
+                btn.style.color = '#1a2b4c';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+                btn.style.color = '#6b7a8f';
+            }
+            input.focus();
+        }
+
+        // ========== TOGGLE INSCRIPTION ==========
         function toggleInscription() {
             playSound('click');
             const loginForm = document.getElementById('loginForm');
@@ -244,6 +291,7 @@
             document.getElementById('inscriptionMessage').textContent = '';
         }
 
+        // ========== LOGIN ==========
         async function login() {
             const code = document.getElementById('codeSecret').value.trim();
             const message = document.getElementById('loginMessage');
@@ -286,6 +334,7 @@
             }
         }
 
+        // ========== INSCRIPTION ==========
         async function submitInscription() {
             playSound('click');
 
@@ -363,6 +412,13 @@
 
         document.getElementById('codeSecret').addEventListener('input', function() {
             this.value = this.value.toUpperCase();
+        });
+
+        // Fermer les modales en cliquant sur le fond
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.remove('active');
+            }
         });
     </script>
 </body>

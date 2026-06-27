@@ -1,4 +1,4 @@
-// agent-script.js - Version complète avec sons personnalisés
+// agent-script.js - Version complète et corrigée
 
 // ========== SONS PERSONNALISÉS ==========
 let clickSoundA = null;
@@ -50,7 +50,7 @@ function showToastA(message, type = 'info') {
     }, 3000);
 }
 
-function logoutA() {
+function logout() {
     playSoundA('click');
     sessionStorage.removeItem('user');
     window.location.href = 'index.html';
@@ -147,6 +147,34 @@ function filtrerAgentCommandes(statut) {
     loadAgentCommandes();
 }
 
+// ========== COMMANDES CRUD AGENT ==========
+async function afficherCommandeA(id) {
+    playSoundA('click');
+    try {
+        const doc = await db.collection('commandes').doc(id).get();
+        const data = doc.data();
+        if (!data) { showToastA('⚠️ Commande non trouvée.', 'error'); return; }
+        const articles = data.articles ? data.articles.map(a => `${a.quantite} x ${a.nom}`).join('\n') : 'Aucun';
+        alert(`📋 COMMANDE ${data.numero||'N/A'}\n\nVendeur: ${data.vendeur||'N/A'}\n📦 Articles:\n${articles}\n💰 ${data.prixTotal||0} FCFA\n📍 ${data.quartier||''}, ${data.ville||''}\n📌 ${data.statut||'N/A'}`);
+    } catch(e) { showToastA('❌ Erreur affichage.', 'error'); }
+}
+
+async function modifierCommandeA(id) {
+    playSoundA('click');
+    await openCommandeModalAgent(id);
+}
+
+async function supprimerCommandeA(id) {
+    playSoundA('click');
+    if (!confirm('⚠️ Supprimer définitivement cette commande ?')) return;
+    try {
+        await db.collection('commandes').doc(id).delete();
+        playSoundA('success');
+        showToastA('🗑️ Commande supprimée.', 'success');
+        loadAgentDashboard();
+    } catch(e) { showToastA('❌ Erreur suppression.', 'error'); }
+}
+
 // ========== APPELS AGENT ==========
 let fileAppelA = [];
 let indexAppelA = 0;
@@ -156,8 +184,7 @@ function lancerAppelSuivantA() {
     db.collection('commandes').where('statut','==','À appeler').orderBy('dateCreation','asc').get()
         .then(snapshot => {
             if (snapshot.empty) { showToastA('✅ Aucune commande en attente.', 'success'); return; }
-            fileAppelA = [];
-            snapshot.forEach(doc => fileAppelA.push({ id: doc.id, data: doc.data() }));
+            fileAppelA = []; snapshot.forEach(doc => fileAppelA.push({ id: doc.id, data: doc.data() }));
             indexAppelA = 0;
             afficherAppelA();
         })
@@ -198,7 +225,10 @@ function afficherAppelA() {
 }
 
 function fermerAppelModalA() { document.getElementById('appelModalAgent').classList.remove('active'); }
-document.getElementById('appelModalAgent').addEventListener('click', function(e) { if (e.target === this) fermerAppelModalA(); });
+
+document.getElementById('appelModalAgent').addEventListener('click', function(e) {
+    if (e.target === this) fermerAppelModalA();
+});
 
 async function validerAppelA(id, statut) {
     try {
@@ -233,8 +263,8 @@ function whatsappClientA(id) {
     });
 }
 
-// ========== COMMANDE MODALE AGENT ==========
-function switchModeA(mode) {
+// ========== MODALE NOUVELLE COMMANDE AGENT ==========
+function switchModeAgent(mode) {
     playSoundA('click');
     document.getElementById('toggleSaisieAgent').classList.toggle('active', mode === 'saisie');
     document.getElementById('toggleCollageAgent').classList.toggle('active', mode === 'collage');
@@ -242,17 +272,316 @@ function switchModeA(mode) {
     document.getElementById('modeCollageAgent').style.display = mode === 'collage' ? 'block' : 'none';
 }
 
-// ... (reste du code agent-script.js avec playSoundA partout)
+let isEditModeAgent = false;
+let editCommandeIdAgent = null;
+
+async function openCommandeModalAgent(commandeId) {
+    playSoundA('click');
+    isEditModeAgent = !!commandeId;
+    editCommandeIdAgent = commandeId || null;
+    resetCommandeFormAgent();
+    await loadVendeursForSelectA('commandeVendeurSelectAgent');
+    document.getElementById('commandeModalAgent').classList.add('active');
+    if (isEditModeAgent) {
+        await loadCommandeForEditAgent(commandeId);
+    }
+}
+
+function closeCommandeModalAgent() {
+    playSoundA('click');
+    document.getElementById('commandeModalAgent').classList.remove('active');
+    resetCommandeFormAgent();
+    isEditModeAgent = false;
+    editCommandeIdAgent = null;
+}
+
+function resetCommandeFormAgent() {
+    document.getElementById('articlesContainerAgent').innerHTML = '';
+    addArticleRowAgent();
+    document.getElementById('commandePrixAgent').value = '';
+    document.getElementById('commandeFraisInclusAgent').checked = true;
+    document.getElementById('commandeZoneAgent').value = '';
+    document.getElementById('commandeQuartierAgent').value = '';
+    document.getElementById('commandeVilleAgent').value = '';
+    document.getElementById('commandeNoteAgent').value = '';
+    document.getElementById('collageInputAgent').value = '';
+    document.getElementById('collageResultAgent').innerHTML = '';
+    switchModeAgent('saisie');
+}
+
+async function loadCommandeForEditAgent(id) {
+    const doc = await db.collection('commandes').doc(id).get();
+    const data = doc.data();
+    if (!data) return;
+    if (data.vendeurId) {
+        const select = document.getElementById('commandeVendeurSelectAgent');
+        for(let i=0; i<select.options.length; i++) {
+            if(select.options[i].value === data.vendeurId) { select.value = data.vendeurId; break; }
+        }
+    }
+    const container = document.getElementById('articlesContainerAgent');
+    container.innerHTML = '';
+    if(data.articles && data.articles.length > 0) {
+        data.articles.forEach(a => {
+            const row = document.createElement('div');
+            row.className = 'article-row';
+            row.innerHTML = `<input type="number" class="article-qty" value="${a.quantite||1}" min="1" /><input type="text" class="article-name" value="${a.nom||''}" />`;
+            container.appendChild(row);
+        });
+    } else { addArticleRowAgent(); }
+    document.getElementById('commandePrixAgent').value = data.prixTotal || '';
+    document.getElementById('commandeFraisInclusAgent').checked = data.fraisInclus !== undefined ? data.fraisInclus : true;
+    document.getElementById('commandeZoneAgent').value = data.zone || '';
+    document.getElementById('commandeQuartierAgent').value = data.quartier || '';
+    document.getElementById('commandeVilleAgent').value = data.ville || '';
+    document.getElementById('commandeNoteAgent').value = data.note || '';
+}
+
+async function saveCommandeAgent() {
+    const select = document.getElementById('commandeVendeurSelectAgent');
+    const vendeurId = select.value;
+    if (!vendeurId) { showToastA('⚠️ Sélectionnez un vendeur.', 'error'); return; }
+    const vendeurNom = select.options[select.selectedIndex].textContent;
+    const rows = document.querySelectorAll('#articlesContainerAgent .article-row');
+    const articles = [];
+    rows.forEach(row => {
+        const qty = row.querySelector('.article-qty').value;
+        const name = row.querySelector('.article-name').value.trim();
+        if (name) articles.push({ quantite: parseInt(qty)||1, nom: name });
+    });
+    if (articles.length === 0) { showToastA('⚠️ Ajoutez au moins un article.', 'error'); return; }
+    const prix = parseInt(document.getElementById('commandePrixAgent').value);
+    if (isNaN(prix) || prix <= 0) { showToastA('⚠️ Saisissez un prix valide.', 'error'); return; }
+    const quartier = document.getElementById('commandeQuartierAgent').value.trim();
+    const ville = document.getElementById('commandeVilleAgent').value.trim();
+    if (!quartier || !ville) { showToastA('⚠️ Renseignez quartier ET ville.', 'error'); return; }
+    const zone = document.getElementById('commandeZoneAgent').value;
+    const fraisInclus = document.getElementById('commandeFraisInclusAgent').checked;
+    const note = document.getElementById('commandeNoteAgent').value.trim();
+    const zones = { 'Libreville':2000, 'Akanda':3000, 'Owendo':3000, 'Bikélé':3000, 'Autres':4000 };
+    const fraisLivraison = fraisInclus ? 0 : (zones[zone] || 0);
+
+    const data = {
+        articles, prixTotal: prix, fraisInclus, fraisLivraison, zone, quartier, ville, note,
+        vendeurId, vendeur: vendeurNom, statut: 'À appeler', dateCreation: new Date()
+    };
+
+    try {
+        if (isEditModeAgent && editCommandeIdAgent) {
+            await db.collection('commandes').doc(editCommandeIdAgent).update({ ...data, dateModification: new Date() });
+            playSoundA('success');
+            showToastA('✅ Commande mise à jour !', 'success');
+        } else {
+            const snapshot = await db.collection('commandes').get();
+            const count = snapshot.size + 1;
+            data.numero = `HDIX-${String(count).padStart(3, '0')}`;
+            await db.collection('commandes').add(data);
+            playSoundA('success');
+            showToastA(`✅ Commande ${data.numero} enregistrée !`, 'success');
+        }
+        closeCommandeModalAgent();
+        loadAgentDashboard();
+    } catch(e) { console.error(e); showToastA('❌ Erreur enregistrement.', 'error'); }
+}
+
+function addArticleRowAgent() {
+    playSoundA('click');
+    const container = document.getElementById('articlesContainerAgent');
+    const row = document.createElement('div');
+    row.className = 'article-row';
+    row.innerHTML = `<input type="number" class="article-qty" placeholder="Qté" min="1" value="1" /><input type="text" class="article-name" placeholder="Nom de l'article" />`;
+    container.appendChild(row);
+}
+
+async function loadVendeursForSelectA(selectId) {
+    try {
+        const snapshot = await db.collection('vendeurs').orderBy('nom').get();
+        const select = document.getElementById(selectId);
+        select.innerHTML = '<option value="">-- Sélectionnez un vendeur --</option>';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const opt = document.createElement('option');
+            opt.value = doc.id;
+            opt.textContent = data.nom;
+            select.appendChild(opt);
+        });
+    } catch(e) { console.error(e); }
+}
+
+// ========== COLLAGE AGENT ==========
+function analyserCollageAgent() {
+    playSoundA('click');
+    const text = document.getElementById('collageInputAgent').value.trim();
+    if (!text) { showToastA('⚠️ Collez un texte.', 'error'); return; }
+    const result = analyserTexteAgent(text);
+    const container = document.getElementById('collageResultAgent');
+    if (result.articles.length === 0) {
+        container.innerHTML = '<div class="required-note" style="border-left-color:#c0392b;">⚠️ Aucun article détecté.</div>';
+        return;
+    }
+    let html = `<div style="margin-top:16px;"><h4>📋 Commande détectée</h4><div class="recap-item"><span>Vendeur</span><span>${result.vendeur||'Non détecté'}</span></div>
+        <div class="recap-item"><span>Articles</span><span>${result.articles.length}</span></div>
+        <div class="recap-item" style="flex-direction:column;align-items:flex-start;padding:8px 0;">
+        <strong>Détail :</strong><span>${result.articles.map(a=>`${a.quantite} x ${a.nom}`).join('<br>')}</span></div>
+        <div class="recap-item"><span>Prix</span><span>${result.prix||'Non détecté'} FCFA</span></div>
+        <div class="recap-item"><span>Lieu</span><span>${result.lieu||'Non détecté'}</span></div>
+        <div style="margin-top:16px;display:flex;gap:10px;"><button onclick="validerCollageAgent()" class="btn-success" style="flex:1;padding:12px;">✅ Valider</button>
+        <button onclick="closeCommandeModalAgent()" class="btn-secondary" style="flex:1;padding:12px;">Annuler</button></div></div>`;
+    container.innerHTML = html;
+    window._collageResultAgent = result;
+}
+
+function validerCollageAgent() {
+    playSoundA('click');
+    const result = window._collageResultAgent;
+    if (!result) return;
+    const container = document.getElementById('articlesContainerAgent');
+    container.innerHTML = '';
+    result.articles.forEach(a => {
+        const row = document.createElement('div');
+        row.className = 'article-row';
+        row.innerHTML = `<input type="number" class="article-qty" value="${a.quantite}" min="1" /><input type="text" class="article-name" value="${a.nom}" />`;
+        container.appendChild(row);
+    });
+    if (result.prix) document.getElementById('commandePrixAgent').value = result.prix;
+    if (result.lieu) {
+        const parts = result.lieu.split(',');
+        if (parts.length >= 2) {
+            document.getElementById('commandeQuartierAgent').value = parts[0].trim();
+            document.getElementById('commandeVilleAgent').value = parts[1].trim();
+        } else { document.getElementById('commandeQuartierAgent').value = result.lieu; }
+    }
+    if (result.vendeur) {
+        const select = document.getElementById('commandeVendeurSelectAgent');
+        for(let i=0; i<select.options.length; i++) {
+            if(select.options[i].textContent === result.vendeur) { select.value = select.options[i].value; break; }
+        }
+    }
+    switchModeAgent('saisie');
+    document.getElementById('collageResultAgent').innerHTML = '';
+    showToastA('✅ Données collées importées !', 'success');
+}
+
+function analyserTexteAgent(text) {
+    const result = { articles: [], vendeur: '', prix: null, lieu: '' };
+    const lines = text.split('\n').filter(l => l.trim());
+    lines.forEach(line => {
+        const trimmed = line.trim();
+        const articleMatch = trimmed.match(/^(\d+)\s*[xX]?\s*(.+)$/);
+        if (articleMatch) { result.articles.push({ quantite: parseInt(articleMatch[1]), nom: articleMatch[2].trim() }); return; }
+        const prixMatch = trimmed.match(/(\d+[\s']?\d*)\s*F?CFA?/i);
+        if (prixMatch && !result.prix) { result.prix = parseInt(prixMatch[1].replace(/\s/g,'')); return; }
+        if (trimmed.includes('ville')||trimmed.includes('quartier')||trimmed.includes('Libreville')||trimmed.includes('Akanda')||trimmed.includes('Owendo')) { result.lieu = trimmed; return; }
+        if (trimmed.includes('vendeur')||trimmed.includes('Vendeur')) { result.vendeur = trimmed.replace(/vendeur\s*/i,'').trim(); return; }
+    });
+    if (!result.lieu) { for(const line of lines) { if(line.length > 3 && line.length < 50 && !result.lieu) { result.lieu = line.trim(); } } }
+    if (!result.vendeur) { result.vendeur = prompt('Vendeur pour cette commande :') || ''; }
+    return result;
+}
 
 // ========== STOCK AGENT ==========
 function openStockModalAgent() {
     playSoundA('click');
-    // ... (contenu existant)
+    document.getElementById('stockModalAgent').classList.add('active');
+    loadVendeursForSelectA('stockVendeurSelectAgent');
+    document.getElementById('stockArticlesContainerAgent').innerHTML = '';
+    addStockRowAgent();
+}
+
+function closeStockModalAgent() {
+    playSoundA('click');
+    document.getElementById('stockModalAgent').classList.remove('active');
+}
+
+function addStockRowAgent() {
+    playSoundA('click');
+    const container = document.getElementById('stockArticlesContainerAgent');
+    const row = document.createElement('div');
+    row.className = 'article-row';
+    row.innerHTML = `<input type="text" class="stock-article-name" placeholder="Nom de l'article" /><input type="number" class="stock-article-qty" placeholder="Quantité" min="1" value="1" />`;
+    container.appendChild(row);
 }
 
 async function saveStockAgent() {
-    // ... (contenu existant)
-    playSoundA('success');
+    const select = document.getElementById('stockVendeurSelectAgent');
+    const vendeurId = select.value;
+    if (!vendeurId) { showToastA('⚠️ Sélectionnez un vendeur.', 'error'); return; }
+    const rows = document.querySelectorAll('#stockArticlesContainerAgent .article-row');
+    const articles = [];
+    rows.forEach(row => {
+        const name = row.querySelector('.stock-article-name').value.trim();
+        const qty = parseInt(row.querySelector('.stock-article-qty').value);
+        if (name && qty > 0) articles.push({ nom: name, quantite: qty });
+    });
+    if (articles.length === 0) { showToastA('⚠️ Ajoutez au moins un article.', 'error'); return; }
+    try {
+        const vendeurDoc = await db.collection('vendeurs').doc(vendeurId).get();
+        const vendeurNom = vendeurDoc.data().nom;
+        for (const a of articles) {
+            const existing = await db.collection('stock').where('vendeurId','==',vendeurId).where('nom','==',a.nom).get();
+            if (existing.empty) { await db.collection('stock').add({ vendeurId, vendeurNom, nom: a.nom, quantite: a.quantite }); }
+            else { const doc = existing.docs[0]; await db.collection('stock').doc(doc.id).update({ quantite: (doc.data().quantite||0) + a.quantite }); }
+        }
+        playSoundA('success');
+        showToastA(`✅ Stock ajouté pour ${vendeurNom} !`, 'success');
+        closeStockModalAgent();
+        loadAgentDashboard();
+    } catch(e) { console.error(e); showToastA('❌ Erreur stockage.', 'error'); }
+}
+
+// ========== CONSULTER STOCK AGENT ==========
+async function consulterStockAgent() {
+    playSoundA('click');
+    document.getElementById('consulterStockModalAgent').classList.add('active');
+    await rafraichirStockAgent();
+}
+
+function closeConsulterStockModalAgent() {
+    playSoundA('click');
+    document.getElementById('consulterStockModalAgent').classList.remove('active');
+}
+
+async function rafraichirStockAgent() {
+    try {
+        const snapshot = await db.collection('stock').get();
+        const container = document.getElementById('stockListContainerAgent');
+        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucun stock enregistré.</p>'; return; }
+        let html = '<div class="list-container">';
+        const vendeurs = {};
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (!vendeurs[data.vendeurId]) vendeurs[data.vendeurId] = { nom: data.vendeurNom || 'Inconnu', articles: [] };
+            vendeurs[data.vendeurId].articles.push({ id: doc.id, nom: data.nom, quantite: data.quantite || 0 });
+        });
+        for (const [vid, v] of Object.entries(vendeurs)) {
+            html += `<div style="font-weight:700;padding:8px 0;border-top:1px solid #e2e8f0;">🏪 ${v.nom}</div>`;
+            v.articles.forEach(a => {
+                html += `<div class="list-item"><div><strong>${a.nom}</strong><br><small>${a.quantite} unités</small></div>
+                    <div><button onclick="retirerStockAgent('${a.id}')" class="btn-delete">➖ Retirer</button></div></div>`;
+            });
+        }
+        html += '</div>';
+        container.innerHTML = html;
+    } catch(e) { console.error(e); }
+}
+
+async function retirerStockAgent(id) {
+    const qty = prompt('Quantité à retirer :');
+    if (!qty) return;
+    const num = parseInt(qty);
+    if (isNaN(num) || num <= 0) { showToastA('⚠️ Quantité invalide.', 'error'); return; }
+    try {
+        const doc = await db.collection('stock').doc(id).get();
+        const data = doc.data();
+        const newQty = (data.quantite || 0) - num;
+        if (newQty < 0) { showToastA('⚠️ Stock insuffisant.', 'error'); return; }
+        if (newQty === 0) { await db.collection('stock').doc(id).delete(); }
+        else { await db.collection('stock').doc(id).update({ quantite: newQty }); }
+        playSoundA('success');
+        showToastA('✅ Stock retiré avec succès !', 'success');
+        await rafraichirStockAgent();
+        loadAgentDashboard();
+    } catch(e) { console.error(e); showToastA('❌ Erreur retrait.', 'error'); }
 }
 
 // ========== INIT ==========
@@ -265,4 +594,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (u.role !== 'agent') { window.location.href = 'index.html'; return; }
     } catch { window.location.href = 'index.html'; return; }
     loadAgentDashboard();
+
+    // Fermer les modales en cliquant sur le fond
+    document.getElementById('commandeModalAgent').addEventListener('click', function(e) {
+        if (e.target === this) closeCommandeModalAgent();
+    });
+    document.getElementById('stockModalAgent').addEventListener('click', function(e) {
+        if (e.target === this) closeStockModalAgent();
+    });
+    document.getElementById('consulterStockModalAgent').addEventListener('click', function(e) {
+        if (e.target === this) closeConsulterStockModalAgent();
+    });
+    document.getElementById('appelModalAgent').addEventListener('click', function(e) {
+        if (e.target === this) fermerAppelModalA();
+    });
 });

@@ -23,7 +23,7 @@
     <!-- ALERTE APPELS -->
     <div class="alerte-appels" id="alerteAppels">
         <div class="message"><span class="count" id="appelCount">0</span> commande(s) en attente</div>
-        <button class="btn-lancer" onclick="lancerAppelSuivant()">🔴 Lancer la campagne</button>
+        <button class="btn-lancer" onclick="lancerAppelSuivantA()">🔴 Lancer la campagne</button>
     </div>
 
     <!-- STATISTIQUES -->
@@ -58,7 +58,10 @@
 
 <!-- MODALE APPEL -->
 <div class="modal" id="appelModalAgent">
-    <div class="modal-content"><button class="modal-close" onclick="fermerAppelModalAgent()">✕</button><div id="appelContentAgent"><p class="empty-message">Aucun appel en cours.</p></div></div>
+    <div class="modal-content">
+        <button class="modal-close" onclick="fermerAppelModalA()">✕</button>
+        <div id="appelContentAgent"><p class="empty-message">Aucun appel en cours.</p></div>
+    </div>
 </div>
 
 <!-- MODALE NOUVELLE COMMANDE (Agent) -->
