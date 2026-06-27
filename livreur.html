@@ -14,17 +14,13 @@
 </head>
 <body>
 <div class="app-container">
+
     <header class="admin-header">
-        <div class="header-left">
-            <h1>HDIX</h1>
-            <span class="badge">Livreur</span>
-        </div>
-        <div class="header-right">
-            <span id="livreurName">Livreur</span>
-            <button onclick="logout()" class="btn-logout">Déconnexion</button>
-        </div>
+        <div class="header-left"><h1>HDIX</h1><span class="badge">Livreur</span></div>
+        <div class="header-right"><span id="livreurName">Livreur</span><button onclick="logoutL()" class="btn-logout">Déconnexion</button></div>
     </header>
 
+    <!-- Infos livreur -->
     <div class="livreur-card">
         <div><strong>Nom :</strong> <span id="livreurNom">Chargement...</span></div>
         <div><strong>Zone :</strong> <span id="livreurZone">-</span></div>
@@ -39,18 +35,23 @@
         </div>
     </div>
 
+    <!-- Mes commandes -->
     <h3 style="margin-top:24px;">📦 Mes commandes</h3>
-    <div id="commandesContainer">
+    <div id="commandesLivreurContainer">
         <p class="empty-message">Aucune commande assignée.</p>
     </div>
 
+    <!-- Journal -->
     <div style="margin-top:24px;">
         <h4>📋 Journal</h4>
         <div id="logContainer" class="log">
             <p style="color:#6b7a8f;">En attente d'actions...</p>
         </div>
     </div>
+
 </div>
+
+<div class="spinner-overlay" id="globalSpinnerL"><div class="spinner"></div></div>
 
 <script src="firebase-config.js"></script>
 <script src="livreur-script.js"></script>

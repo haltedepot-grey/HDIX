@@ -11,6 +11,100 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" href="style.css" />
+    <style>
+        .inscription-form {
+            display: none;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+        }
+        .inscription-form.active {
+            display: block;
+        }
+        .inscription-form .form-group {
+            margin-bottom: 12px;
+        }
+        .inscription-form label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+        .inscription-form select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 16px;
+            outline: none;
+            background: white;
+        }
+        .btn-inscription {
+            width: 100%;
+            padding: 14px;
+            background: #2d7d46;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-inscription:hover {
+            background: #3a8d56;
+        }
+        .btn-inscription:active {
+            transform: scale(0.98);
+        }
+        .link-inscription {
+            color: #1a2b4c;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: underline;
+        }
+        .link-inscription:hover {
+            color: #2a3b5c;
+        }
+        .login-toggle {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 14px;
+            color: #6b7a8f;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 1000;
+            max-width: 90%;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            animation: slideUp 0.4s ease;
+        }
+        .toast-success {
+            background: #2d7d46;
+            color: white;
+        }
+        .toast-error {
+            background: #c0392b;
+            color: white;
+        }
+        .toast-info {
+            background: #1a2b4c;
+            color: white;
+        }
+        @keyframes slideUp {
+            from { transform: translateX(-50%) translateY(40px); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -19,71 +113,106 @@
                 <h1>HDIX</h1>
                 <p class="subtitle">Halte-Dépôt · Gestion logistique</p>
             </div>
-            
-            <div class="login-form">
+
+            <div id="loginForm" class="login-form">
                 <h2>🔐 Connexion</h2>
                 <p class="info-text">Saisissez votre code secret à 8 caractères</p>
-                
+
                 <div class="form-group">
                     <input type="password" id="codeSecret" placeholder="Code secret" maxlength="8" autocomplete="off" />
                 </div>
-                
+
                 <button onclick="login()" class="btn-primary">Se connecter</button>
-                
+
                 <p id="loginMessage" class="error-message"></p>
-                
-                <p style="margin-top:16px;font-size:13px;color:#6b7a8f;text-align:center;">
-                    Pas de compte ? <a href="#" onclick="alert('Contactez l\'administrateur HDIX.')">Contacter l'admin</a>
-                </p>
+
+                <div class="login-toggle">
+                    Pas encore de compte ? <span class="link-inscription" onclick="toggleInscription()">Inscrivez-vous</span>
+                </div>
+            </div>
+
+            <div id="inscriptionForm" class="inscription-form">
+                <h2>📝 Inscription</h2>
+                <p class="info-text">Créez votre compte. L'admin validera votre demande.</p>
+
+                <div class="form-group">
+                    <label>Rôle *</label>
+                    <select id="inscriptionRole">
+                        <option value="vendeur">Vendeur</option>
+                        <option value="livreur">Livreur</option>
+                        <option value="agent">Agent</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Nom et prénom *</label>
+                    <input type="text" id="inscriptionNom" placeholder="Jean Dupont" />
+                </div>
+
+                <div class="form-group">
+                    <label>Nom de la boutique (vendeur uniquement)</label>
+                    <input type="text" id="inscriptionBoutique" placeholder="Ma Boutique" />
+                </div>
+
+                <div class="form-group">
+                    <label>Numéro de téléphone *</label>
+                    <input type="tel" id="inscriptionTelephone" placeholder="+241 66 12 34 56" />
+                </div>
+
+                <div class="form-group">
+                    <label>Abréviation (vendeur uniquement, ex: MODE)</label>
+                    <input type="text" id="inscriptionAbreviation" placeholder="MODE" maxlength="6" />
+                </div>
+
+                <button onclick="submitInscription()" class="btn-inscription">📤 Envoyer la demande</button>
+
+                <p id="inscriptionMessage" class="error-message"></p>
+
+                <div class="login-toggle">
+                    Vous avez déjà un compte ? <span class="link-inscription" onclick="toggleInscription()">Se connecter</span>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="firebase-config.js"></script>
     <script>
-        // Sons pour la connexion
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        let audioCtx = null;
+        // ========== SONS PERSONNALISÉS ==========
+        let clickSound = null;
+        let successSound = null;
+        let errorSound = null;
+
+        function loadSounds() {
+            try {
+                clickSound = new Audio('assets/sounds/click.mp3');
+                successSound = new Audio('assets/sounds/success.mp3');
+                errorSound = new Audio('assets/sounds/error.mp3');
+                clickSound.load();
+                successSound.load();
+                errorSound.load();
+            } catch(e) {
+                console.log('Sons non disponibles');
+            }
+        }
 
         function playSound(type) {
             try {
-                if (!audioCtx) audioCtx = new AudioCtx();
-                const oscillator = audioCtx.createOscillator();
-                const gainNode = audioCtx.createGain();
-                oscillator.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
-                oscillator.type = 'sine';
-                gainNode.gain.value = 0.3;
-                
-                if (type === 'click') {
-                    oscillator.frequency.value = 600;
-                    oscillator.start();
-                    oscillator.stop(audioCtx.currentTime + 0.05);
-                } else if (type === 'success') {
-                    oscillator.frequency.value = 880;
-                    oscillator.start();
-                    setTimeout(() => {
-                        const osc2 = audioCtx.createOscillator();
-                        const gain2 = audioCtx.createGain();
-                        osc2.connect(gain2);
-                        gain2.connect(audioCtx.destination);
-                        osc2.frequency.value = 1100;
-                        osc2.type = 'sine';
-                        gain2.gain.value = 0.3;
-                        osc2.start();
-                        osc2.stop(audioCtx.currentTime + 0.05);
-                    }, 100);
-                    oscillator.stop(audioCtx.currentTime + 0.1);
-                } else if (type === 'error') {
-                    oscillator.frequency.value = 300;
-                    oscillator.type = 'sawtooth';
-                    gainNode.gain.value = 0.2;
-                    oscillator.start();
-                    oscillator.stop(audioCtx.currentTime + 0.15);
+                if (type === 'click' && clickSound) {
+                    clickSound.currentTime = 0;
+                    clickSound.play().catch(e => {});
+                } else if (type === 'success' && successSound) {
+                    successSound.currentTime = 0;
+                    successSound.play().catch(e => {});
+                } else if (type === 'error' && errorSound) {
+                    errorSound.currentTime = 0;
+                    errorSound.play().catch(e => {});
                 }
             } catch(e) {}
         }
 
+        loadSounds();
+
+        // ========== TOAST ==========
         function showToast(message, type) {
             const existing = document.querySelector('.toast');
             if (existing) existing.remove();
@@ -95,35 +224,54 @@
                 toast.style.opacity = '0';
                 toast.style.transition = 'opacity 0.3s';
                 setTimeout(() => toast.remove(), 400);
-            }, 3000);
+            }, 4000);
+        }
+
+        function toggleInscription() {
+            playSound('click');
+            const loginForm = document.getElementById('loginForm');
+            const inscriptionForm = document.getElementById('inscriptionForm');
+            const isLogin = loginForm.style.display !== 'none';
+
+            if (isLogin) {
+                loginForm.style.display = 'none';
+                inscriptionForm.classList.add('active');
+            } else {
+                loginForm.style.display = 'block';
+                inscriptionForm.classList.remove('active');
+            }
+            document.getElementById('loginMessage').textContent = '';
+            document.getElementById('inscriptionMessage').textContent = '';
         }
 
         async function login() {
             const code = document.getElementById('codeSecret').value.trim();
             const message = document.getElementById('loginMessage');
-            
+
             if (!code) {
                 playSound('error');
                 message.textContent = '⚠️ Veuillez saisir votre code secret.';
                 return;
             }
-            
+
             try {
                 const snapshot = await db.collection('users')
                     .where('code_secret', '==', code)
                     .get();
-                
+
                 if (!snapshot.empty) {
                     const user = snapshot.docs[0].data();
                     sessionStorage.setItem('user', JSON.stringify(user));
                     playSound('success');
-                    
+
                     if (user.role === 'admin') {
                         window.location.href = 'admin.html';
                     } else if (user.role === 'livreur') {
                         window.location.href = 'livreur.html';
                     } else if (user.role === 'vendeur') {
                         window.location.href = 'vendeur.html';
+                    } else if (user.role === 'agent') {
+                        window.location.href = 'agent.html';
                     } else {
                         message.textContent = '❌ Rôle non reconnu.';
                     }
@@ -135,6 +283,77 @@
                 console.error('Erreur:', error);
                 playSound('error');
                 message.textContent = '❌ Erreur de connexion.';
+            }
+        }
+
+        async function submitInscription() {
+            playSound('click');
+
+            const role = document.getElementById('inscriptionRole').value;
+            const nom = document.getElementById('inscriptionNom').value.trim();
+            const boutique = document.getElementById('inscriptionBoutique').value.trim();
+            const telephone = document.getElementById('inscriptionTelephone').value.trim();
+            const abreviation = document.getElementById('inscriptionAbreviation').value.trim().toUpperCase();
+            const message = document.getElementById('inscriptionMessage');
+
+            if (!nom) {
+                playSound('error');
+                message.textContent = '⚠️ Veuillez saisir votre nom.';
+                return;
+            }
+            if (!telephone) {
+                playSound('error');
+                message.textContent = '⚠️ Veuillez saisir votre numéro de téléphone.';
+                return;
+            }
+            if (role === 'vendeur' && !boutique) {
+                playSound('error');
+                message.textContent = '⚠️ Veuillez saisir le nom de votre boutique.';
+                return;
+            }
+            if (role === 'vendeur' && !abreviation) {
+                playSound('error');
+                message.textContent = '⚠️ Veuillez saisir une abréviation (ex: MODE).';
+                return;
+            }
+
+            try {
+                const existing = await db.collection('users')
+                    .where('telephone', '==', telephone)
+                    .get();
+                if (!existing.empty) {
+                    playSound('error');
+                    message.textContent = '⚠️ Ce numéro est déjà enregistré.';
+                    return;
+                }
+
+                await db.collection('inscriptions').add({
+                    nom: nom,
+                    role: role,
+                    boutique: boutique || '',
+                    telephone: telephone,
+                    abreviation: abreviation || '',
+                    statut: 'en_attente',
+                    dateDemande: new Date()
+                });
+
+                playSound('success');
+                showToast('✅ Demande envoyée ! Vous recevrez votre code par WhatsApp.', 'success');
+                message.textContent = '✅ Demande envoyée avec succès ! L\'admin vous contactera.';
+
+                document.getElementById('inscriptionNom').value = '';
+                document.getElementById('inscriptionBoutique').value = '';
+                document.getElementById('inscriptionTelephone').value = '';
+                document.getElementById('inscriptionAbreviation').value = '';
+
+                setTimeout(() => {
+                    toggleInscription();
+                }, 3000);
+
+            } catch (error) {
+                console.error('Erreur inscription:', error);
+                playSound('error');
+                message.textContent = '❌ Erreur lors de l\'inscription.';
             }
         }
 

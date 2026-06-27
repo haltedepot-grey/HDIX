@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>HDIX - Agent</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="assets/icon-192.png" />
+    <meta name="theme-color" content="#1a2b4c" />
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="app-container">
+
+    <header class="admin-header">
+        <div class="header-left"><h1>HDIX</h1><span class="badge">Agent</span></div>
+        <div class="header-right"><span id="agentName">Agent</span><button onclick="logout()" class="btn-logout">Déconnexion</button></div>
+    </header>
+
+    <!-- ALERTE APPELS -->
+    <div class="alerte-appels" id="alerteAppels">
+        <div class="message"><span class="count" id="appelCount">0</span> commande(s) en attente</div>
+        <button class="btn-lancer" onclick="lancerAppelSuivant()">🔴 Lancer la campagne</button>
+    </div>
+
+    <!-- STATISTIQUES -->
+    <div class="stats-grid">
+        <div class="stat-card"><span class="stat-number" id="statAppeler">0</span><span class="stat-label">À appeler</span></div>
+        <div class="stat-card"><span class="stat-number" id="statEncours">0</span><span class="stat-label">En cours</span></div>
+        <div class="stat-card"><span class="stat-number" id="statLivree">0</span><span class="stat-label">Livrées</span></div>
+    </div>
+
+    <!-- LISTE COMMANDES -->
+    <div class="commandes-list">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            <h3>📋 Commandes</h3>
+            <button onclick="loadAgentCommandes()" class="refresh-btn">🔄</button>
+        </div>
+        <div class="filter-buttons">
+            <button onclick="filtrerAgentCommandes('all')" class="filter-btn active" data-filter="all">📋 Toutes</button>
+            <button onclick="filtrerAgentCommandes('À appeler')" class="filter-btn" data-filter="À appeler" style="background:#fef9e7;">📞 À appeler</button>
+            <button onclick="filtrerAgentCommandes('En-cours')" class="filter-btn" data-filter="En-cours" style="background:#ebf5fb;">🔄 En-cours</button>
+            <button onclick="filtrerAgentCommandes('Livrée')" class="filter-btn" data-filter="Livrée" style="background:#eafaf1;">✅ Livrée</button>
+        </div>
+        <div id="agentCommandesContainer"><div class="spinner" style="margin:30px auto;"></div></div>
+    </div>
+
+    <!-- ACTIONS BAS -->
+    <div class="agent-bottom-actions">
+        <button onclick="openCommandeModalAgent()" class="btn-create">📝 Nouvelle commande</button>
+        <button onclick="openStockModalAgent()" class="btn-stock">📦 Ajouter stock</button>
+    </div>
+
+</div>
+
+<!-- MODALE APPEL -->
+<div class="modal" id="appelModalAgent">
+    <div class="modal-content"><button class="modal-close" onclick="fermerAppelModalAgent()">✕</button><div id="appelContentAgent"><p class="empty-message">Aucun appel en cours.</p></div></div>
+</div>
+
+<!-- MODALE NOUVELLE COMMANDE (Agent) -->
+<div class="modal" id="commandeModalAgent">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeCommandeModalAgent()">✕</button>
+        <div class="step-title">📝 NOUVELLE COMMANDE</div>
+        <div class="toggle-container">
+            <button class="toggle-option active" id="toggleSaisieAgent" onclick="switchModeAgent('saisie')">✏️ Saisir</button>
+            <button class="toggle-option" id="toggleCollageAgent" onclick="switchModeAgent('collage')">📋 Coller</button>
+        </div>
+        <div id="modeSaisieAgent">
+            <div class="vendeur-select-row"><label>Vendeur</label><select id="commandeVendeurSelectAgent"><option value="">-- Sélectionnez --</option></select></div>
+            <div id="articlesContainerAgent"><div class="article-row"><input type="number" class="article-qty" placeholder="Qté" min="1" value="1" /><input type="text" class="article-name" placeholder="Nom de l'article" /></div></div>
+            <button onclick="addArticleRowAgent()" class="add-article-btn">+ Ajouter un autre article</button>
+            <div class="form-group"><label>Prix total (FCFA)</label><input type="number" id="commandePrixAgent" placeholder="Ex: 12000" min="0" /></div>
+            <div class="form-group"><label><input type="checkbox" id="commandeFraisInclusAgent" checked /> Frais de livraison inclus</label></div>
+            <div class="form-group"><label>Zone</label><select id="commandeZoneAgent"><option value="">Sélectionnez</option><option value="Libreville">Libreville : 2.000 FCFA</option><option value="Akanda">Akanda : 3.000 FCFA</option><option value="Owendo">Owendo : 3.000 FCFA</option><option value="Bikélé">Bikélé : 3.000 FCFA</option><option value="Autres">Autres</option></select></div>
+            <div class="form-group"><label>Quartier</label><input type="text" id="commandeQuartierAgent" placeholder="Ex: Batterie IV" /></div>
+            <div class="form-group"><label>Ville</label><input type="text" id="commandeVilleAgent" placeholder="Ex: Libreville" /></div>
+            <div class="form-group"><label>Note</label><textarea id="commandeNoteAgent" rows="2" placeholder="Sonner 3 fois..."></textarea></div>
+            <button onclick="saveCommandeAgent()" class="btn-primary btn-success">✅ Enregistrer</button>
+        </div>
+        <div id="modeCollageAgent" style="display:none;">
+            <div class="collage-zone"><textarea id="collageInputAgent" rows="6" placeholder="Collez le bon de commande ici..."></textarea></div>
+            <button onclick="analyserCollageAgent()" class="btn-collage">🔍 Analyser</button>
+            <div id="collageResultAgent" style="margin-top:16px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- MODALE AJOUTER STOCK (Agent) -->
+<div class="modal" id="stockModalAgent">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeStockModalAgent()">✕</button>
+        <div class="step-title">📦 AJOUTER STOCK</div>
+        <div class="vendeur-select-row"><label>Vendeur</label><select id="stockVendeurSelectAgent"><option value="">-- Sélectionnez --</option></select></div>
+        <div id="stockArticlesContainerAgent"><div class="article-row"><input type="text" class="stock-article-name" placeholder="Nom de l'article" /><input type="number" class="stock-article-qty" placeholder="Quantité" min="1" value="1" /></div></div>
+        <button onclick="addStockRowAgent()" class="add-article-btn">+ Ajouter un autre article</button>
+        <div style="display:flex;gap:10px;margin-top:16px;">
+            <button onclick="consulterStockAgent()" class="btn-secondary" style="flex:1;">📦 Consulter stock</button>
+            <button onclick="saveStockAgent()" class="btn-primary btn-success" style="flex:1;">✅ Valider</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODALE CONSULTER STOCK (Agent) -->
+<div class="modal" id="consulterStockModalAgent">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeConsulterStockModalAgent()">✕</button>
+        <div class="step-title">📦 GESTION DU STOCK</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+            <select id="stockFiltreVendeurAgent" style="flex:2;"><option value="all">Tous les vendeurs</option></select>
+            <button onclick="rafraichirStockAgent()" class="btn-secondary" style="flex:1;">🔄 Rafraîchir</button>
+        </div>
+        <div id="stockListContainerAgent"><p class="empty-message">Chargement du stock...</p></div>
+        <button onclick="closeConsulterStockModalAgent()" class="btn-primary" style="margin-top:12px;">⬅️ Retour</button>
+    </div>
+</div>
+
+<div class="spinner-overlay" id="globalSpinnerAgent"><div class="spinner"></div></div>
+
+<script src="firebase-config.js"></script>
+<script src="agent-script.js"></script>
+</body>
+</html>

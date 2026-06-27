@@ -14,33 +14,102 @@
 </head>
 <body>
 <div class="app-container">
+
     <header class="admin-header">
-        <div class="header-left">
-            <h1>HDIX</h1>
-            <span class="badge">Vendeur</span>
-        </div>
-        <div class="header-right">
-            <span id="vendeurName">Vendeur</span>
-            <button onclick="logout()" class="btn-logout">Déconnexion</button>
-        </div>
+        <div class="header-left"><h1>HDIX</h1><span class="badge">Vendeur</span></div>
+        <div class="header-right"><span id="vendeurName">Vendeur</span><button onclick="logoutV()" class="btn-logout">Déconnexion</button></div>
     </header>
 
-    <div class="livreur-card">
-        <div><strong>Boutique :</strong> <span id="vendeurBoutique">Chargement...</span></div>
-        <div><strong>Ventes du mois :</strong> <span id="vendeurVentes">0 FCFA</span></div>
-        <div><strong>Commandes :</strong> <span id="vendeurCommandes">0</span></div>
+    <!-- NOUVELLE COMMANDE -->
+    <div class="vendeur-top-actions">
+        <button onclick="openCommandeModalV()" class="btn-create">📝 Nouvelle commande</button>
     </div>
 
-    <h3 style="margin-top:24px;">📊 Mon bilan</h3>
-    <div id="bilanVendeurContainer">
-        <p class="empty-message">Chargement de votre bilan...</p>
+    <!-- LISTE COMMANDES -->
+    <div class="commandes-list">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            <h3>📋 Commandes</h3>
+            <button onclick="loadVendeurCommandes()" class="refresh-btn">🔄</button>
+        </div>
+        <div class="filter-buttons">
+            <button onclick="filtrerVCommandes('all')" class="filter-btn active" data-filter="all">📋 Toutes</button>
+            <button onclick="filtrerVCommandes('À appeler')" class="filter-btn" data-filter="À appeler" style="background:#fef9e7;">📞 À appeler</button>
+            <button onclick="filtrerVCommandes('En-cours')" class="filter-btn" data-filter="En-cours" style="background:#ebf5fb;">🔄 En-cours</button>
+            <button onclick="filtrerVCommandes('Livrée')" class="filter-btn" data-filter="Livrée" style="background:#eafaf1;">✅ Livrée</button>
+        </div>
+        <div style="text-align:right;margin-bottom:8px;">
+            <button onclick="voirToutesCommandesV()" class="btn-secondary" style="padding:6px 14px;font-size:12px;">📋 Voir toutes</button>
+        </div>
+        <div id="vendeurCommandesContainer"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
 
-    <h3 style="margin-top:24px;">📋 Mes commandes</h3>
-    <div id="commandesVendeurContainer">
-        <p class="empty-message">Aucune commande.</p>
+    <!-- BILAN -->
+    <div class="bilan-section">
+        <h3>📊 BILAN (Global)</h3>
+        <div class="bilan-stats-vendeur" id="bilanStatsV">
+            <div class="stat-livree">🔴 Livrée : <span id="bLivree">0</span></div>
+            <div class="stat-indisponible">🔴 Indisponible : <span id="bIndisponible">0</span></div>
+            <div class="stat-encours">🔴 En-cours : <span id="bEncours">0</span></div>
+            <div class="stat-va-rappeler">🔴 Va rappeler : <span id="bVaRappeler">0</span></div>
+            <div class="stat-annulee">🔴 Annulée : <span id="bAnnulee">0</span></div>
+            <div class="stat-refusee">🔴 Refusée : <span id="bRefusee">0</span></div>
+            <div class="stat-reportee">🔴 Reportée : <span id="bReportee">0</span></div>
+        </div>
+        <div class="bilan-montants-vendeur">
+            <div class="montant-total">💰 Montant : <span id="bMontant">0</span> FCFA</div>
+            <div class="montant-livraison">🚚 Livraison : <span id="bLivraison">0</span> FCFA</div>
+            <div class="montant-a-envoyer">📤 À envoyer : <span id="bAEnvoyer">0</span> FCFA</div>
+        </div>
+        <div class="vendeur-actions-bottom">
+            <button onclick="copyBilanV()" class="btn-copy">📋 Copier bilan</button>
+            <button onclick="voirStockV()" class="btn-stock">📦 Voir stock</button>
+        </div>
+    </div>
+
+</div>
+
+<!-- MODALE NOUVELLE COMMANDE (Vendeur) -->
+<div class="modal" id="commandeModalV">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeCommandeModalV()">✕</button>
+        <div class="step-title">📝 NOUVELLE COMMANDE</div>
+        <div class="toggle-container">
+            <button class="toggle-option active" id="toggleSaisieV" onclick="switchModeV('saisie')">✏️ Saisir</button>
+            <button class="toggle-option" id="toggleCollageV" onclick="switchModeV('collage')">📋 Coller</button>
+        </div>
+        <div id="modeSaisieV">
+            <div id="articlesContainerV"><div class="article-row"><input type="number" class="article-qty" placeholder="Qté" min="1" value="1" /><input type="text" class="article-name" placeholder="Nom de l'article" /></div></div>
+            <button onclick="addArticleRowV()" class="add-article-btn">+ Ajouter un autre article</button>
+            <div class="form-group"><label>Prix total (FCFA)</label><input type="number" id="commandePrixV" placeholder="Ex: 12000" min="0" /></div>
+            <div class="form-group"><label><input type="checkbox" id="commandeFraisInclusV" checked /> Frais de livraison inclus</label></div>
+            <div class="form-group"><label>Zone</label><select id="commandeZoneV"><option value="">Sélectionnez</option><option value="Libreville">Libreville : 2.000 FCFA</option><option value="Akanda">Akanda : 3.000 FCFA</option><option value="Owendo">Owendo : 3.000 FCFA</option><option value="Bikélé">Bikélé : 3.000 FCFA</option><option value="Autres">Autres</option></select></div>
+            <div class="form-group"><label>Quartier</label><input type="text" id="commandeQuartierV" placeholder="Ex: Batterie IV" /></div>
+            <div class="form-group"><label>Ville</label><input type="text" id="commandeVilleV" placeholder="Ex: Libreville" /></div>
+            <div class="form-group"><label>Note</label><textarea id="commandeNoteV" rows="2" placeholder="Sonner 3 fois..."></textarea></div>
+            <button onclick="saveCommandeV()" class="btn-primary btn-success">✅ Enregistrer</button>
+        </div>
+        <div id="modeCollageV" style="display:none;">
+            <div class="collage-zone"><textarea id="collageInputV" rows="6" placeholder="Collez le bon de commande ici..."></textarea></div>
+            <button onclick="analyserCollageV()" class="btn-collage">🔍 Analyser</button>
+            <div id="collageResultV" style="margin-top:16px;"></div>
+        </div>
     </div>
 </div>
+
+<!-- MODALE VOIR STOCK (Vendeur) -->
+<div class="modal" id="stockModalV">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeStockModalV()">✕</button>
+        <div class="step-title">📦 MON STOCK</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+            <button onclick="rafraichirStockV()" class="btn-secondary" style="flex:1;">🔄 Rafraîchir</button>
+        </div>
+        <div id="stockListContainerV"><p class="empty-message">Chargement du stock...</p></div>
+        <button onclick="closeStockModalV()" class="btn-primary" style="margin-top:12px;">⬅️ Retour</button>
+    </div>
+</div>
+
+<div class="spinner-overlay" id="globalSpinnerV"><div class="spinner"></div></div>
 
 <script src="firebase-config.js"></script>
 <script src="vendeur-script.js"></script>
