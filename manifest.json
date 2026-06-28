@@ -2,10 +2,11 @@
   "name": "HDIX - Halte-Dépôt",
   "short_name": "HDIX",
   "description": "Application de gestion logistique Halte-Dépôt",
-  "start_url": "index.html",
+  "start_url": "splash.html",
   "display": "standalone",
   "background_color": "#f5f7fa",
   "theme_color": "#1a2b4c",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "assets/android-chrome-192x192.png",
@@ -18,6 +19,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "assets/splash.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
