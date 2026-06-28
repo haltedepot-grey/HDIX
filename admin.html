@@ -16,6 +16,45 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" href="style.css" />
+    <style>
+        /* Styles pour les sous-navigations */
+        .sub-nav {
+            display: flex;
+            gap: 8px;
+            margin: 12px 0 16px 0;
+            flex-wrap: wrap;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 12px;
+        }
+        .sub-nav-btn {
+            padding: 8px 16px;
+            border: none;
+            background: #f1f3f5;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #4a5568;
+            touch-action: manipulation;
+        }
+        .sub-nav-btn:hover {
+            background: #e2e8f0;
+        }
+        .sub-nav-btn.active {
+            background: #1a2b4c;
+            color: white;
+        }
+        .sub-nav-btn:active {
+            transform: scale(0.95);
+        }
+        .sub-section {
+            display: none;
+        }
+        .sub-section.active {
+            display: block;
+        }
+    </style>
 </head>
 <body>
 <div class="app-container">
@@ -34,105 +73,79 @@
         </div>
     </header>
 
-    <!-- NAVIGATION -->
+    <!-- ========== NAVIGATION PRINCIPALE (4 ONGLETS) ========== -->
     <div class="admin-nav">
-        <div class="nav-group">
-            <button class="nav-btn active" onclick="showSection('commandes')">📦 Commandes</button>
-            <div class="nav-sub">
-                <button class="nav-btn" onclick="showSection('appels')">📞 Appels</button>
-                <button class="nav-btn" onclick="showSection('tournees')">🗺️ Tournées</button>
-            </div>
-        </div>
-        <div class="nav-group">
-            <button class="nav-btn" onclick="showSection('vendeurs')">👤 Vendeurs</button>
-            <div class="nav-sub">
-                <button class="nav-btn" onclick="showSection('livreurs')">🚚 Livreurs</button>
-                <button class="nav-btn" onclick="showSection('stockage')">📦 Stockage</button>
-            </div>
-        </div>
-        <div class="nav-group">
-            <button class="nav-btn" onclick="showSection('bilan')">📊 Bilan</button>
-            <div class="nav-sub">
-                <button class="nav-btn" onclick="showSection('kpi')">📈 KPI</button>
-            </div>
-        </div>
-        <button class="nav-btn" onclick="showSection('inscriptions')">📝 Inscriptions</button>
-        <button class="nav-btn" onclick="window.location.href='tresorerie.html'">💰 Trésorerie</button>
+        <button class="nav-btn active" onclick="showSection('commandes')">📦 Commandes</button>
+        <button class="nav-btn" onclick="showSection('stocks')">📦 Stocks</button>
+        <button class="nav-btn" onclick="showSection('administration')">⚙️ Administration</button>
+        <button class="nav-btn" onclick="showSection('bilan')">📊 Bilan</button>
     </div>
 
-    <!-- SECTION KPI -->
-    <div id="section-kpi" class="section" style="display:none;">
-        <h3>📊 KPI <button onclick="loadKPI()" class="refresh-btn">🔄</button></h3>
-        <div class="kpi-grid">
-            <div class="kpi-card"><div class="number" id="kpiTotal">0</div><div class="label">Total</div></div>
-            <div class="kpi-card"><div class="number" id="kpiAppeler">0</div><div class="label">À appeler</div></div>
-            <div class="kpi-card"><div class="number" id="kpiLivree">0</div><div class="label">Livrées</div></div>
-            <div class="kpi-card"><div class="number" id="kpiCA">0</div><div class="label">CA</div></div>
-        </div>
-        <div class="kpi-grid">
-            <div class="kpi-card"><div class="number" id="kpiVendeurs">0</div><div class="label">Vendeurs</div></div>
-            <div class="kpi-card"><div class="number" id="kpiLivreurs">0</div><div class="label">Livreurs</div></div>
-            <div class="kpi-card"><div class="number" id="kpiTauxLivraison">0%</div><div class="label">Taux</div></div>
-            <div class="kpi-card"><div class="number" id="kpiMoyenne">0</div><div class="label">Panier moyen</div></div>
-        </div>
-    </div>
-
-    <!-- SECTION COMMANDES -->
+    <!-- ========================================================== -->
+    <!-- SECTION 1 : COMMANDES                                       -->
+    <!-- ========================================================== -->
     <div id="section-commandes" class="section active">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-            <h3>📋 Commandes</h3>
-            <button onclick="loadCommandes()" class="refresh-btn">🔄</button>
+        <div class="sub-nav">
+            <button class="sub-nav-btn active" onclick="showSubSection('commandes-liste')">📋 Liste</button>
+            <button class="sub-nav-btn" onclick="showSubSection('commandes-appels')">📞 Appels</button>
+            <button class="sub-nav-btn" onclick="showSubSection('commandes-tournees')">🚚 Tournées</button>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 16px 0;gap:12px;flex-wrap:wrap;">
-            <button onclick="openCommandeModal()" class="btn-create" style="flex:1;min-width:200px;">✨ Nouvelle commande</button>
+
+        <!-- SOUS-SECTION : Liste des commandes -->
+        <div id="sub-commandes-liste" class="sub-section active">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+                <h3>📋 Commandes</h3>
+                <button onclick="loadCommandes()" class="refresh-btn">🔄</button>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 16px 0;gap:12px;flex-wrap:wrap;">
+                <button onclick="openCommandeModal()" class="btn-create" style="flex:1;min-width:200px;">✨ Nouvelle commande</button>
+            </div>
+            <div class="filter-buttons">
+                <button onclick="filtrerCommandes('all')" class="filter-btn active" data-filter="all">📋 Toutes</button>
+                <button onclick="filtrerCommandes('À appeler')" class="filter-btn" data-filter="À appeler" style="background:#fef9e7;">📞 À appeler</button>
+                <button onclick="filtrerCommandes('En-cours')" class="filter-btn" data-filter="En-cours" style="background:#ebf5fb;">🔄 En-cours</button>
+                <button onclick="filtrerCommandes('Livrée')" class="filter-btn" data-filter="Livrée" style="background:#eafaf1;">✅ Livrée</button>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card"><span class="stat-number" id="statAppeler">0</span><span class="stat-label">À appeler</span></div>
+                <div class="stat-card"><span class="stat-number" id="statLivree">0</span><span class="stat-label">Livrées</span></div>
+                <div class="stat-card"><span class="stat-number" id="statTotal">0</span><span class="stat-label">Total</span></div>
+            </div>
+            <div class="commandes-list"><div id="commandesContainer"><div class="spinner" style="margin:30px auto;"></div></div></div>
         </div>
-        <div class="filter-buttons">
-            <button onclick="filtrerCommandes('all')" class="filter-btn active" data-filter="all">📋 Toutes</button>
-            <button onclick="filtrerCommandes('À appeler')" class="filter-btn" data-filter="À appeler" style="background:#fef9e7;">📞 À appeler</button>
-            <button onclick="filtrerCommandes('En-cours')" class="filter-btn" data-filter="En-cours" style="background:#ebf5fb;">🔄 En-cours</button>
-            <button onclick="filtrerCommandes('Livrée')" class="filter-btn" data-filter="Livrée" style="background:#eafaf1;">✅ Livrée</button>
+
+        <!-- SOUS-SECTION : Appels clients -->
+        <div id="sub-commandes-appels" class="sub-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <h3>📞 Appels clients</h3>
+                <button onclick="loadAppels()" class="refresh-btn">🔄</button>
+            </div>
+            <div id="appelsContainer"><div class="spinner" style="margin:30px auto;"></div></div>
+            <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;">
+                <button onclick="lancerAppelSuivant()" class="btn-primary" style="flex:1;">📞 Lancer campagne</button>
+            </div>
+            <div id="appelModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="fermerAppelModal()">✕</button><div id="appelContent"><p class="empty-message">Aucun appel en cours.</p></div></div></div>
         </div>
-        <div class="stats-grid">
-            <div class="stat-card"><span class="stat-number" id="statAppeler">0</span><span class="stat-label">À appeler</span></div>
-            <div class="stat-card"><span class="stat-number" id="statLivree">0</span><span class="stat-label">Livrées</span></div>
-            <div class="stat-card"><span class="stat-number" id="statTotal">0</span><span class="stat-label">Total</span></div>
+
+        <!-- SOUS-SECTION : Tournées -->
+        <div id="sub-commandes-tournees" class="sub-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <h3>🗺️ Tournées</h3>
+                <button onclick="optimiserTournees()" class="refresh-btn">🔄</button>
+            </div>
+            <div style="margin:16px 0;">
+                <button onclick="optimiserTournees()" class="btn-primary" style="flex:1;">🔍 Optimiser tournées</button>
+                <button onclick="attributionAuto()" class="btn-primary" style="flex:1;margin-top:8px;background:#8e44ad;">🤖 Attribution auto</button>
+            </div>
+            <div id="tourneesContainer"><p class="empty-message">Les commandes en cours seront optimisées ici.</p></div>
         </div>
-        <div class="commandes-list"><div id="commandesContainer"><div class="spinner" style="margin:30px auto;"></div></div></div>
     </div>
 
-    <!-- SECTION APPELS -->
-    <div id="section-appels" class="section" style="display:none;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📞 Appels</h3><button onclick="loadAppels()" class="refresh-btn">🔄</button></div>
-        <div id="appelsContainer"><div class="spinner" style="margin:30px auto;"></div></div>
-        <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;">
-            <button onclick="lancerAppelSuivant()" class="btn-primary" style="flex:1;">📞 Lancer campagne</button>
-        </div>
-        <div id="appelModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="fermerAppelModal()">✕</button><div id="appelContent"><p class="empty-message">Aucun appel en cours.</p></div></div></div>
-    </div>
-
-    <!-- SECTION VENDEURS (avec bouton Réparer) -->
-    <div id="section-vendeurs" class="section" style="display:none;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-            <h3>👤 Vendeurs</h3>
-            <button onclick="loadVendeurs()" class="refresh-btn">🔄</button>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
-            <button onclick="openVendeurForm()" class="btn-primary" style="flex:1;min-width:150px;">➕ Ajouter un vendeur</button>
-            <button onclick="reparerVendeurs()" class="btn-primary" style="flex:1;min-width:150px;background:#8e44ad;">🔧 Réparer les vendeurs</button>
-        </div>
-        <div id="vendeursList"><div class="spinner" style="margin:30px auto;"></div></div>
-    </div>
-
-    <!-- SECTION LIVREURS -->
-    <div id="section-livreurs" class="section" style="display:none;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>🚚 Livreurs</h3><button onclick="loadLivreurs()" class="refresh-btn">🔄</button></div>
-        <button onclick="openLivreurForm()" class="btn-primary" style="margin:12px 0;">➕ Ajouter un livreur</button>
-        <div id="livreursList"><div class="spinner" style="margin:30px auto;"></div></div>
-    </div>
-
-    <!-- SECTION STOCKAGE -->
-    <div id="section-stockage" class="section" style="display:none;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📦 Stockage</h3><button onclick="loadStockage()" class="refresh-btn">🔄</button></div>
+    <!-- ========================================================== -->
+    <!-- SECTION 2 : STOCKS                                          -->
+    <!-- ========================================================== -->
+    <div id="section-stocks" class="section" style="display:none;">
+        <h3>📦 Gestion des stocks</h3>
         <div class="stockage-grid">
             <div class="stockage-card"><h4>Casiers occupés</h4><div id="stockageResume"></div></div>
             <div class="stockage-card"><h4>Dettes du mois</h4><div id="stockageDettes"></div></div>
@@ -142,39 +155,130 @@
         <div id="stockageList"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
 
-    <!-- SECTION BILAN -->
-    <div id="section-bilan" class="section" style="display:none;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📊 Bilan</h3><button onclick="loadVendeursForBilan()" class="refresh-btn">🔄</button></div>
-        <div class="bilan-section">
-            <div class="bilan-controls">
-                <select id="bilanVendeurSelect"><option value="all">Tous les vendeurs</option></select>
-                <button onclick="generateBilan()" class="btn-copy" style="flex:1;">📊 Générer</button>
-                <button onclick="copyBilan()" class="btn-copy">📋 Copier</button>
-                <button onclick="generatePDF()" class="btn-copy" style="background:#8e44ad;">📄 PDF</button>
-                <button onclick="envoyerBilanWhatsApp()" class="btn-copy" style="background:#25D366;">💬 WhatsApp</button>
+    <!-- ========================================================== -->
+    <!-- SECTION 3 : ADMINISTRATION                                  -->
+    <!-- ========================================================== -->
+    <div id="section-administration" class="section" style="display:none;">
+        <div class="sub-nav">
+            <button class="sub-nav-btn active" onclick="showSubSection('admin-vendeurs')">👤 Vendeurs</button>
+            <button class="sub-nav-btn" onclick="showSubSection('admin-livreurs')">🚚 Livreurs</button>
+            <button class="sub-nav-btn" onclick="showSubSection('admin-inscriptions')">📝 Inscriptions</button>
+        </div>
+
+        <!-- SOUS-SECTION : Vendeurs -->
+        <div id="sub-admin-vendeurs" class="sub-section active">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <h3>👤 Vendeurs</h3>
+                <button onclick="loadVendeurs()" class="refresh-btn">🔄</button>
             </div>
-            <div id="bilanContainer"><p class="empty-message">Sélectionnez un vendeur et cliquez sur "Générer".</p></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
+                <button onclick="openVendeurForm()" class="btn-primary" style="flex:1;min-width:150px;">➕ Ajouter un vendeur</button>
+                <button onclick="reparerVendeurs()" class="btn-primary" style="flex:1;min-width:150px;background:#8e44ad;">🔧 Réparer les vendeurs</button>
+            </div>
+            <div id="vendeursList"><div class="spinner" style="margin:30px auto;"></div></div>
         </div>
-        <div class="bilan-section"><h3>📈 Rapport mensuel</h3><button onclick="generateMonthlyReport()" class="btn-primary">📊 Générer rapport</button><div id="monthlyReportContainer"><p class="empty-message">Cliquez sur "Générer".</p></div></div>
+
+        <!-- SOUS-SECTION : Livreurs -->
+        <div id="sub-admin-livreurs" class="sub-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <h3>🚚 Livreurs</h3>
+                <button onclick="loadLivreurs()" class="refresh-btn">🔄</button>
+            </div>
+            <button onclick="openLivreurForm()" class="btn-primary" style="margin:12px 0;">➕ Ajouter un livreur</button>
+            <div id="livreursList"><div class="spinner" style="margin:30px auto;"></div></div>
+        </div>
+
+        <!-- SOUS-SECTION : Inscriptions -->
+        <div id="sub-admin-inscriptions" class="sub-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <h3>📝 Inscriptions</h3>
+                <button onclick="loadInscriptions()" class="refresh-btn">🔄</button>
+            </div>
+            <div id="inscriptionsList"><div class="spinner" style="margin:30px auto;"></div></div>
+        </div>
     </div>
 
-    <!-- SECTION INSCRIPTIONS -->
-    <div id="section-inscriptions" class="section" style="display:none;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📝 Inscriptions</h3><button onclick="loadInscriptions()" class="refresh-btn">🔄</button></div>
-        <div id="inscriptionsList"><div class="spinner" style="margin:30px auto;"></div></div>
-    </div>
-
-    <!-- SECTION TOURNÉES -->
-    <div id="section-tournees" class="section" style="display:none;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>🗺️ Tournées</h3><button onclick="optimiserTournees()" class="refresh-btn">🔄</button></div>
-        <div style="margin:16px 0;">
-            <button onclick="optimiserTournees()" class="btn-primary" style="flex:1;">🔍 Optimiser tournées</button>
-            <button onclick="attributionAuto()" class="btn-primary" style="flex:1;margin-top:8px;background:#8e44ad;">🤖 Attribution auto</button>
+    <!-- ========================================================== -->
+    <!-- SECTION 4 : BILAN                                           -->
+    <!-- ========================================================== -->
+    <div id="section-bilan" class="section" style="display:none;">
+        <div class="sub-nav">
+            <button class="sub-nav-btn active" onclick="showSubSection('bilan-kpi')">📊 KPI</button>
+            <button class="sub-nav-btn" onclick="showSubSection('bilan-general')">📊 Bilan général</button>
+            <button class="sub-nav-btn" onclick="showSubSection('bilan-tresorerie')">💰 Trésorerie</button>
         </div>
-        <div id="tourneesContainer"><p class="empty-message">Les commandes en cours seront optimisées ici.</p></div>
+
+        <!-- SOUS-SECTION : KPI -->
+        <div id="sub-bilan-kpi" class="sub-section active">
+            <h3>📊 KPI <button onclick="loadKPI()" class="refresh-btn">🔄</button></h3>
+            <div class="kpi-grid">
+                <div class="kpi-card"><div class="number" id="kpiTotal">0</div><div class="label">Total</div></div>
+                <div class="kpi-card"><div class="number" id="kpiAppeler">0</div><div class="label">À appeler</div></div>
+                <div class="kpi-card"><div class="number" id="kpiLivree">0</div><div class="label">Livrées</div></div>
+                <div class="kpi-card"><div class="number" id="kpiCA">0</div><div class="label">CA</div></div>
+            </div>
+            <div class="kpi-grid">
+                <div class="kpi-card"><div class="number" id="kpiVendeurs">0</div><div class="label">Vendeurs</div></div>
+                <div class="kpi-card"><div class="number" id="kpiLivreurs">0</div><div class="label">Livreurs</div></div>
+                <div class="kpi-card"><div class="number" id="kpiTauxLivraison">0%</div><div class="label">Taux</div></div>
+                <div class="kpi-card"><div class="number" id="kpiMoyenne">0</div><div class="label">Panier moyen</div></div>
+            </div>
+        </div>
+
+        <!-- SOUS-SECTION : Bilan général -->
+        <div id="sub-bilan-general" class="sub-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <h3>📊 Bilan</h3>
+                <button onclick="loadVendeursForBilan()" class="refresh-btn">🔄</button>
+            </div>
+            <div class="bilan-section">
+                <div class="bilan-controls">
+                    <select id="bilanVendeurSelect"><option value="all">Tous les vendeurs</option></select>
+                    <button onclick="generateBilan()" class="btn-copy" style="flex:1;">📊 Générer</button>
+                    <button onclick="copyBilan()" class="btn-copy">📋 Copier</button>
+                    <button onclick="generatePDF()" class="btn-copy" style="background:#8e44ad;">📄 PDF</button>
+                    <button onclick="envoyerBilanWhatsApp()" class="btn-copy" style="background:#25D366;">💬 WhatsApp</button>
+                </div>
+                <div id="bilanContainer"><p class="empty-message">Sélectionnez un vendeur et cliquez sur "Générer".</p></div>
+            </div>
+            <div class="bilan-section"><h3>📈 Rapport mensuel</h3><button onclick="generateMonthlyReport()" class="btn-primary">📊 Générer rapport</button><div id="monthlyReportContainer"><p class="empty-message">Cliquez sur "Générer".</p></div></div>
+        </div>
+
+        <!-- SOUS-SECTION : Trésorerie -->
+        <div id="sub-bilan-tresorerie" class="sub-section">
+            <h3>💰 Trésorerie</h3>
+            <div style="display:flex;flex-wrap:wrap;gap:16px;margin:12px 0;">
+                <div style="flex:1;min-width:150px;background:white;border-radius:12px;padding:16px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                    <div style="font-size:14px;color:#6b7a8f;">Solde disponible</div>
+                    <div style="font-size:28px;font-weight:700;color:#2d7d46;" id="soldeDisplay">0 FCFA</div>
+                </div>
+                <div style="flex:1;min-width:150px;background:white;border-radius:12px;padding:16px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                    <div style="font-size:14px;color:#6b7a8f;">Airtel Money</div>
+                    <div style="font-size:16px;font-weight:600;" id="airtelDisplay">+241 66 12 34 56</div>
+                    <button onclick="ouvrirAirtel()" class="btn-stock" style="margin-top:8px;background:#f7931a;color:white;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;">📲 Envoyer</button>
+                </div>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;">
+                <button onclick="openDepotModal()" class="btn-primary" style="flex:1;background:#2d7d46;">📥 Dépôt</button>
+                <button onclick="openRetraitModal()" class="btn-primary" style="flex:1;background:#c0392b;">📤 Retrait</button>
+                <button onclick="exporterTransactions()" class="btn-primary" style="flex:1;background:#8e44ad;">📊 Export</button>
+            </div>
+            <div class="filter-buttons">
+                <button onclick="filtrerTransactions('toutes')" class="filter-btn active" data-filter="toutes">📋 Toutes</button>
+                <button onclick="filtrerTransactions('depot')" class="filter-btn" data-filter="depot" style="background:#eafaf1;">📥 Dépôts</button>
+                <button onclick="filtrerTransactions('retrait')" class="filter-btn" data-filter="retrait" style="background:#fdedec;">📤 Retraits</button>
+                <button onclick="filtrerTransactions('airtel')" class="filter-btn" data-filter="airtel" style="background:#fef9e7;">📱 Airtel</button>
+            </div>
+            <div class="commandes-list">
+                <h3>📋 Historique des transactions</h3>
+                <div id="transactionsContainer"><div class="spinner" style="margin:30px auto;"></div></div>
+            </div>
+        </div>
     </div>
 
 </div>
+
+<!-- ========== MODALES ========== -->
 
 <!-- MODALE NOUVELLE COMMANDE -->
 <div class="modal" id="commandeModal">
@@ -199,9 +303,7 @@
             <button onclick="saveCommande()" class="btn-primary btn-success" style="width:100%;padding:12px;">✅ Enregistrer</button>
         </div>
         <div id="modeCollage">
-            <div class="collage-zone">
-                <textarea id="collageInput" rows="6" placeholder="Collez le bon de commande ici..."></textarea>
-            </div>
+            <div class="collage-zone"><textarea id="collageInput" rows="6" placeholder="Collez le bon de commande ici..."></textarea></div>
             <div style="display:flex;gap:10px;margin-top:8px;">
                 <button onclick="collerTexte()" class="btn-secondary" style="flex:1;">📋 Coller</button>
                 <button onclick="analyserCollage()" class="btn-collage" style="flex:1;">🔍 Analyser</button>
@@ -252,6 +354,29 @@
         </div>
         <div id="stockListContainer"><p class="empty-message">Chargement...</p></div>
         <button onclick="closeConsulterStockModal()" class="btn-primary" style="margin-top:12px;">⬅️ Retour</button>
+    </div>
+</div>
+
+<!-- MODALES TRÉSORERIE -->
+<div class="modal" id="depotModal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeDepotModal()">✕</button>
+        <div class="step-title">📥 NOUVEAU DÉPÔT</div>
+        <div class="form-group"><label>Montant (FCFA)</label><input type="number" id="depotMontant" placeholder="Ex: 25000" min="0" /></div>
+        <div class="form-group"><label>Mode de paiement</label><select id="depotMode"><option value="especes">Espèces</option><option value="airtel_money">Airtel Money</option><option value="virement">Virement</option></select></div>
+        <div class="form-group"><label>Description</label><input type="text" id="depotDescription" placeholder="Ex: Dépôt de Marie Cosmetics" /></div>
+        <button onclick="enregistrerDepot()" class="btn-primary btn-success">✅ Enregistrer</button>
+    </div>
+</div>
+
+<div class="modal" id="retraitModal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeRetraitModal()">✕</button>
+        <div class="step-title">📤 NOUVEAU RETRAIT</div>
+        <div class="form-group"><label>Montant (FCFA)</label><input type="number" id="retraitMontant" placeholder="Ex: 15000" min="0" /></div>
+        <div class="form-group"><label>Mode de retrait</label><select id="retraitMode"><option value="especes">Espèces</option><option value="airtel_money">Airtel Money</option><option value="virement">Virement</option></select></div>
+        <div class="form-group"><label>Description</label><input type="text" id="retraitDescription" placeholder="Ex: Retrait pour livreur" /></div>
+        <button onclick="enregistrerRetrait()" class="btn-primary btn-danger">📤 Retirer</button>
     </div>
 </div>
 
