@@ -17,39 +17,127 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" href="style.css" />
     <style>
-        /* Styles pour les dropdowns */
-        .sub-nav-dropdown {
-            margin: 12px 0 16px 0;
+        /* ========== NAVIGATION AVEC ACCORDÉON ========== */
+        .admin-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 16px 0 24px 0;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 12px;
         }
-        .dropdown-select {
-            width: 100%;
-            padding: 12px 16px;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            font-size: 16px;
+
+        .nav-item {
+            position: relative;
+        }
+
+        .nav-btn {
+            padding: 10px 20px;
+            border: none;
+            background: #f1f3f5;
+            border-radius: 8px;
+            font-size: 14px;
             font-weight: 500;
-            background: white;
-            color: #1a2b4c;
-            outline: none;
             cursor: pointer;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231a2b4c' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 16px center;
-            transition: border-color 0.2s;
+            transition: all 0.2s;
+            color: #4a5568;
+            touch-action: manipulation;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        .dropdown-select:hover {
-            border-color: #1a2b4c;
+
+        .nav-btn:hover {
+            background: #e2e8f0;
         }
-        .dropdown-select:focus {
-            border-color: #1a2b4c;
-            box-shadow: 0 0 0 3px rgba(26, 43, 76, 0.1);
+
+        .nav-btn.active {
+            background: #1a2b4c;
+            color: white;
         }
+
+        .nav-btn .arrow {
+            font-size: 10px;
+            transition: transform 0.3s;
+        }
+
+        .nav-btn .arrow.open {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            min-width: 200px;
+            z-index: 100;
+            padding: 6px;
+            margin-top: 4px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .dropdown-menu.open {
+            display: block;
+            animation: slideDown 0.25s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 10px 16px;
+            border: none;
+            background: transparent;
+            text-align: left;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #1a2b4c;
+            transition: all 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background: #f1f3f5;
+        }
+
+        .dropdown-item.active {
+            background: #1a2b4c;
+            color: white;
+        }
+
+        /* Sous-sections */
         .sub-section {
             display: none;
         }
         .sub-section.active {
             display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .nav-btn {
+                font-size: 13px;
+                padding: 8px 14px;
+            }
+            .dropdown-menu {
+                min-width: 180px;
+                left: -10px;
+            }
         }
     </style>
 </head>
@@ -70,25 +158,56 @@
         </div>
     </header>
 
-    <!-- ========== NAVIGATION PRINCIPALE (4 ONGLETS) ========== -->
+    <!-- ========== NAVIGATION PRINCIPALE (ACCORDÉON) ========== -->
     <div class="admin-nav">
-        <button class="nav-btn active" onclick="showSection('commandes')">📦 Commandes</button>
-        <button class="nav-btn" onclick="showSection('stocks')">📦 Stocks</button>
-        <button class="nav-btn" onclick="showSection('administration')">⚙️ Administration</button>
-        <button class="nav-btn" onclick="showSection('bilan')">📊 Bilan</button>
+
+        <!-- ONGLET 1 : Commandes -->
+        <div class="nav-item">
+            <button class="nav-btn active" onclick="toggleDropdown('commandes')">
+                📦 Commandes <span class="arrow" id="arrow-commandes">▼</span>
+            </button>
+            <div class="dropdown-menu open" id="dropdown-commandes">
+                <button class="dropdown-item active" onclick="selectSubSection('commandes', 'commandes-liste', this)">📋 Liste des commandes</button>
+                <button class="dropdown-item" onclick="selectSubSection('commandes', 'commandes-appels', this)">📞 Appels clients</button>
+                <button class="dropdown-item" onclick="selectSubSection('commandes', 'commandes-tournees', this)">🚚 Tournées</button>
+            </div>
+        </div>
+
+        <!-- ONGLET 2 : Stocks (pas de dropdown) -->
+        <div class="nav-item">
+            <button class="nav-btn" onclick="showSection('stocks')">📦 Stocks</button>
+        </div>
+
+        <!-- ONGLET 3 : Administration -->
+        <div class="nav-item">
+            <button class="nav-btn" onclick="toggleDropdown('administration')">
+                ⚙️ Administration <span class="arrow" id="arrow-administration">▼</span>
+            </button>
+            <div class="dropdown-menu" id="dropdown-administration">
+                <button class="dropdown-item active" onclick="selectSubSection('administration', 'admin-vendeurs', this)">👤 Vendeurs</button>
+                <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-livreurs', this)">🚚 Livreurs</button>
+                <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-inscriptions', this)">📝 Inscriptions</button>
+            </div>
+        </div>
+
+        <!-- ONGLET 4 : Bilan -->
+        <div class="nav-item">
+            <button class="nav-btn" onclick="toggleDropdown('bilan')">
+                📊 Bilan <span class="arrow" id="arrow-bilan">▼</span>
+            </button>
+            <div class="dropdown-menu" id="dropdown-bilan">
+                <button class="dropdown-item active" onclick="selectSubSection('bilan', 'bilan-kpi', this)">📊 KPI</button>
+                <button class="dropdown-item" onclick="selectSubSection('bilan', 'bilan-general', this)">📊 Bilan général</button>
+                <button class="dropdown-item" onclick="selectSubSection('bilan', 'bilan-tresorerie', this)">💰 Trésorerie</button>
+            </div>
+        </div>
+
     </div>
 
     <!-- ========================================================== -->
     <!-- SECTION 1 : COMMANDES                                       -->
     <!-- ========================================================== -->
     <div id="section-commandes" class="section active">
-        <div class="sub-nav-dropdown">
-            <select id="commandesDropdown" onchange="changeCommandeSection(this.value)" class="dropdown-select">
-                <option value="commandes-liste">📋 Liste des commandes</option>
-                <option value="commandes-appels">📞 Appels clients</option>
-                <option value="commandes-tournees">🚚 Tournées</option>
-            </select>
-        </div>
 
         <!-- SOUS-SECTION : Liste des commandes -->
         <div id="sub-commandes-liste" class="sub-section active">
@@ -114,7 +233,7 @@
         </div>
 
         <!-- SOUS-SECTION : Appels clients -->
-        <div id="sub-commandes-appels" class="sub-section" style="display:none;">
+        <div id="sub-commandes-appels" class="sub-section">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                 <h3>📞 Appels clients</h3>
                 <button onclick="loadAppels()" class="refresh-btn">🔄</button>
@@ -127,7 +246,7 @@
         </div>
 
         <!-- SOUS-SECTION : Tournées -->
-        <div id="sub-commandes-tournees" class="sub-section" style="display:none;">
+        <div id="sub-commandes-tournees" class="sub-section">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                 <h3>🗺️ Tournées</h3>
                 <button onclick="optimiserTournees()" class="refresh-btn">🔄</button>
@@ -158,13 +277,6 @@
     <!-- SECTION 3 : ADMINISTRATION                                  -->
     <!-- ========================================================== -->
     <div id="section-administration" class="section" style="display:none;">
-        <div class="sub-nav-dropdown">
-            <select id="adminDropdown" onchange="changeAdminSection(this.value)" class="dropdown-select">
-                <option value="admin-vendeurs">👤 Vendeurs</option>
-                <option value="admin-livreurs">🚚 Livreurs</option>
-                <option value="admin-inscriptions">📝 Inscriptions</option>
-            </select>
-        </div>
 
         <!-- SOUS-SECTION : Vendeurs -->
         <div id="sub-admin-vendeurs" class="sub-section active">
@@ -180,7 +292,7 @@
         </div>
 
         <!-- SOUS-SECTION : Livreurs -->
-        <div id="sub-admin-livreurs" class="sub-section" style="display:none;">
+        <div id="sub-admin-livreurs" class="sub-section">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                 <h3>🚚 Livreurs</h3>
                 <button onclick="loadLivreurs()" class="refresh-btn">🔄</button>
@@ -190,7 +302,7 @@
         </div>
 
         <!-- SOUS-SECTION : Inscriptions -->
-        <div id="sub-admin-inscriptions" class="sub-section" style="display:none;">
+        <div id="sub-admin-inscriptions" class="sub-section">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                 <h3>📝 Inscriptions</h3>
                 <button onclick="loadInscriptions()" class="refresh-btn">🔄</button>
@@ -203,13 +315,6 @@
     <!-- SECTION 4 : BILAN                                           -->
     <!-- ========================================================== -->
     <div id="section-bilan" class="section" style="display:none;">
-        <div class="sub-nav-dropdown">
-            <select id="bilanDropdown" onchange="changeBilanSection(this.value)" class="dropdown-select">
-                <option value="bilan-kpi">📊 KPI</option>
-                <option value="bilan-general">📊 Bilan général</option>
-                <option value="bilan-tresorerie">💰 Trésorerie</option>
-            </select>
-        </div>
 
         <!-- SOUS-SECTION : KPI -->
         <div id="sub-bilan-kpi" class="sub-section active">
@@ -229,7 +334,7 @@
         </div>
 
         <!-- SOUS-SECTION : Bilan général -->
-        <div id="sub-bilan-general" class="sub-section" style="display:none;">
+        <div id="sub-bilan-general" class="sub-section">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
                 <h3>📊 Bilan</h3>
                 <button onclick="loadVendeursForBilan()" class="refresh-btn">🔄</button>
@@ -248,7 +353,7 @@
         </div>
 
         <!-- SOUS-SECTION : Trésorerie -->
-        <div id="sub-bilan-tresorerie" class="sub-section" style="display:none;">
+        <div id="sub-bilan-tresorerie" class="sub-section">
             <h3>💰 Trésorerie</h3>
             <div style="display:flex;flex-wrap:wrap;gap:16px;margin:12px 0;">
                 <div style="flex:1;min-width:150px;background:white;border-radius:12px;padding:16px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">

@@ -1681,3 +1681,78 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.target === this) closeRetraitModal();
     });
 });
+// ========== GESTION DES DROPDOWNS ACCORDÉON ==========
+
+function toggleDropdown(section) {
+    const dropdown = document.getElementById(`dropdown-${section}`);
+    const arrow = document.getElementById(`arrow-${section}`);
+    
+    // Fermer tous les autres dropdowns
+    document.querySelectorAll('.dropdown-menu').forEach(el => {
+        if (el.id !== `dropdown-${section}`) {
+            el.classList.remove('open');
+            const arrowId = el.id.replace('dropdown-', 'arrow-');
+            const otherArrow = document.getElementById(arrowId);
+            if (otherArrow) otherArrow.classList.remove('open');
+        }
+    });
+    
+    // Basculer celui-ci
+    dropdown.classList.toggle('open');
+    if (arrow) arrow.classList.toggle('open');
+}
+
+function selectSubSection(section, subSection, element) {
+    // Mettre à jour le dropdown
+    const dropdown = document.getElementById(`dropdown-${section}`);
+    dropdown.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
+    element.classList.add('active');
+    
+    // Fermer le dropdown
+    dropdown.classList.remove('open');
+    const arrow = document.getElementById(`arrow-${section}`);
+    if (arrow) arrow.classList.remove('open');
+    
+    // Afficher la sous-section
+    document.querySelectorAll(`#section-${section} .sub-section`).forEach(el => {
+        el.classList.remove('active');
+        el.style.display = 'none';
+    });
+    
+    const target = document.getElementById(`sub-${subSection}`);
+    if (target) {
+        target.classList.add('active');
+        target.style.display = 'block';
+    }
+    
+    // Charger les données si besoin
+    if (subSection === 'commandes-liste') loadCommandes();
+    if (subSection === 'commandes-appels') loadAppels();
+    if (subSection === 'commandes-tournees') optimiserTournees();
+    if (subSection === 'admin-vendeurs') loadVendeurs();
+    if (subSection === 'admin-livreurs') loadLivreurs();
+    if (subSection === 'admin-inscriptions') loadInscriptions();
+    if (subSection === 'bilan-kpi') loadKPI();
+    if (subSection === 'bilan-general') loadVendeursForBilan();
+    if (subSection === 'bilan-tresorerie') loadTresorerie();
+}
+
+// Fonction pour afficher une section sans dropdown (ex: Stocks)
+function showSection(section) {
+    // Activer le bon onglet
+    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
+    
+    // Cacher toutes les sections
+    document.querySelectorAll('.section').forEach(el => el.style.display = 'none');
+    
+    // Afficher la section demandée
+    document.getElementById(`section-${section}`).style.display = 'block';
+    
+    // Fermer tous les dropdowns
+    document.querySelectorAll('.dropdown-menu').forEach(el => el.classList.remove('open'));
+    document.querySelectorAll('.arrow').forEach(el => el.classList.remove('open'));
+    
+    // Charger les données
+    if (section === 'stocks') loadStockage();
+}
