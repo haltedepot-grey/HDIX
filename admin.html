@@ -34,6 +34,7 @@
         </div>
     </header>
 
+    <!-- NAVIGATION -->
     <div class="admin-nav">
         <div class="nav-group">
             <button class="nav-btn active" onclick="showSection('commandes')">📦 Commandes</button>
@@ -59,6 +60,7 @@
         <button class="nav-btn" onclick="window.location.href='tresorerie.html'">💰 Trésorerie</button>
     </div>
 
+    <!-- SECTION KPI -->
     <div id="section-kpi" class="section" style="display:none;">
         <h3>📊 KPI <button onclick="loadKPI()" class="refresh-btn">🔄</button></h3>
         <div class="kpi-grid">
@@ -75,6 +77,7 @@
         </div>
     </div>
 
+    <!-- SECTION COMMANDES -->
     <div id="section-commandes" class="section active">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
             <h3>📋 Commandes</h3>
@@ -97,6 +100,7 @@
         <div class="commandes-list"><div id="commandesContainer"><div class="spinner" style="margin:30px auto;"></div></div></div>
     </div>
 
+    <!-- SECTION APPELS -->
     <div id="section-appels" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📞 Appels</h3><button onclick="loadAppels()" class="refresh-btn">🔄</button></div>
         <div id="appelsContainer"><div class="spinner" style="margin:30px auto;"></div></div>
@@ -106,18 +110,27 @@
         <div id="appelModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="fermerAppelModal()">✕</button><div id="appelContent"><p class="empty-message">Aucun appel en cours.</p></div></div></div>
     </div>
 
+    <!-- SECTION VENDEURS (avec bouton Réparer) -->
     <div id="section-vendeurs" class="section" style="display:none;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>👤 Vendeurs</h3><button onclick="loadVendeurs()" class="refresh-btn">🔄</button></div>
-        <button onclick="openVendeurForm()" class="btn-primary" style="margin:12px 0;">➕ Ajouter un vendeur</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+            <h3>👤 Vendeurs</h3>
+            <button onclick="loadVendeurs()" class="refresh-btn">🔄</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
+            <button onclick="openVendeurForm()" class="btn-primary" style="flex:1;min-width:150px;">➕ Ajouter un vendeur</button>
+            <button onclick="reparerVendeurs()" class="btn-primary" style="flex:1;min-width:150px;background:#8e44ad;">🔧 Réparer les vendeurs</button>
+        </div>
         <div id="vendeursList"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
 
+    <!-- SECTION LIVREURS -->
     <div id="section-livreurs" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>🚚 Livreurs</h3><button onclick="loadLivreurs()" class="refresh-btn">🔄</button></div>
         <button onclick="openLivreurForm()" class="btn-primary" style="margin:12px 0;">➕ Ajouter un livreur</button>
         <div id="livreursList"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
 
+    <!-- SECTION STOCKAGE -->
     <div id="section-stockage" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📦 Stockage</h3><button onclick="loadStockage()" class="refresh-btn">🔄</button></div>
         <div class="stockage-grid">
@@ -129,6 +142,7 @@
         <div id="stockageList"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
 
+    <!-- SECTION BILAN -->
     <div id="section-bilan" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📊 Bilan</h3><button onclick="loadVendeursForBilan()" class="refresh-btn">🔄</button></div>
         <div class="bilan-section">
@@ -144,11 +158,13 @@
         <div class="bilan-section"><h3>📈 Rapport mensuel</h3><button onclick="generateMonthlyReport()" class="btn-primary">📊 Générer rapport</button><div id="monthlyReportContainer"><p class="empty-message">Cliquez sur "Générer".</p></div></div>
     </div>
 
+    <!-- SECTION INSCRIPTIONS -->
     <div id="section-inscriptions" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📝 Inscriptions</h3><button onclick="loadInscriptions()" class="refresh-btn">🔄</button></div>
         <div id="inscriptionsList"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
 
+    <!-- SECTION TOURNÉES -->
     <div id="section-tournees" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>🗺️ Tournées</h3><button onclick="optimiserTournees()" class="refresh-btn">🔄</button></div>
         <div style="margin:16px 0;">
@@ -160,7 +176,7 @@
 
 </div>
 
-<!-- ========== MODALE NOUVELLE COMMANDE ========== -->
+<!-- MODALE NOUVELLE COMMANDE -->
 <div class="modal" id="commandeModal">
     <div class="modal-content">
         <button class="modal-close" onclick="closeCommandeModal()">✕</button>
@@ -169,8 +185,6 @@
             <button class="toggle-option active" id="toggleSaisie" onclick="switchMode('saisie')">✏️ Saisir</button>
             <button class="toggle-option" id="toggleCollage" onclick="switchMode('collage')">📋 Coller</button>
         </div>
-
-        <!-- MODE SAISIE -->
         <div id="modeSaisie">
             <div class="vendeur-select-row"><label>Vendeur</label><select id="commandeVendeurSelect"><option value="">-- Sélectionnez --</option></select></div>
             <div class="form-group"><label>Téléphone client *</label><input type="tel" id="commandeTelephone" placeholder="+241 66 12 34 56" /></div>
@@ -184,9 +198,7 @@
             <div class="form-group"><label>Note</label><textarea id="commandeNote" rows="2" placeholder="Sonner 3 fois..."></textarea></div>
             <button onclick="saveCommande()" class="btn-primary btn-success" style="width:100%;padding:12px;">✅ Enregistrer</button>
         </div>
-
-        <!-- MODE COLLAGE AVEC BOUTON COLLER -->
-        <div id="modeCollage" style="display:none;">
+        <div id="modeCollage">
             <div class="collage-zone">
                 <textarea id="collageInput" rows="6" placeholder="Collez le bon de commande ici..."></textarea>
             </div>
@@ -199,7 +211,7 @@
     </div>
 </div>
 
-<!-- ========== MODALE CONFIRMATION COLLAGE ========== -->
+<!-- MODALE CONFIRMATION COLLAGE -->
 <div class="modal" id="collageConfirmationModal">
     <div class="modal-content" style="max-width:550px;">
         <button class="modal-close" onclick="closeCollageConfirmation()">✕</button>
@@ -207,7 +219,7 @@
     </div>
 </div>
 
-<!-- ========== MODALE DÉTAIL COMMANDE ========== -->
+<!-- MODALE DÉTAIL COMMANDE -->
 <div class="modal" id="detailCommandeModal">
     <div class="modal-content" style="max-width:500px;">
         <button class="modal-close" onclick="closeDetailCommandeModal()">✕</button>
@@ -215,7 +227,7 @@
     </div>
 </div>
 
-<!-- ========== MODALES STOCK ========== -->
+<!-- MODALES STOCK -->
 <div class="modal" id="stockModal">
     <div class="modal-content">
         <button class="modal-close" onclick="closeStockModal()">✕</button>
