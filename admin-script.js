@@ -1760,83 +1760,45 @@ function showSection(section) {
 // ========== AGENTS ==========
 async function loadAgents() {
     try {
-        const snapshot = await db.collection('users').where('role', '==', 'agent').orderBy('nom').get();
+        // Requête simplifiée SANS orderBy pour éviter l'index
+        const snapshot = await db.collection('users')
+            .where('role', '==', 'agent')
+            .get();
+        
         const container = document.getElementById('agentsList');
+        
         if (snapshot.empty) {
             container.innerHTML = '<p class="empty-message">Aucun agent enregistré.</p>';
             return;
         }
+        
+        // Trier manuellement en mémoire
+        const agents = [];
+        snapshot.forEach(doc => {
+            agents.push({ id: doc.id, ...doc.data() });
+        });
+        agents.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+        
         let html = '<div class="list-container">';
-        for (const doc of snapshot.docs) {
-            const data = doc.data();
+        for (const data of agents) {
             html += `<div class="list-item">
                 <div>
                     <strong>${data.nom}</strong>
                     <br><small>📞 ${data.telephone || 'N/A'} | 🔑 ${data.code_secret || 'N/A'}</small>
                 </div>
                 <div>
-                    <button onclick="editAgent('${doc.id}')" class="btn-edit">✏️</button>
-                    <button onclick="deleteAgent('${doc.id}')" class="btn-delete">🗑️</button>
-                    <button onclick="resetAgentCode('${doc.id}')" class="btn-edit" style="background:#fef9e7;">🔑</button>
+                    <button onclick="editAgent('${data.id}')" class="btn-edit">✏️</button>
+                    <button onclick="deleteAgent('${data.id}')" class="btn-delete">🗑️</button>
+                    <button onclick="resetAgentCode('${data.id}')" class="btn-edit" style="background:#fef9e7;">🔑</button>
                 </div>
             </div>`;
         }
         html += '</div>';
         container.innerHTML = html;
-    } catch(e) { console.error(e); }
-}
-
-function openAgentForm() {
-    playSound('click');
-    const nom = prompt('Nom de l\'agent :');
-    if (!nom) return;
-    const tel = prompt('Téléphone :');
-    if (!tel) return;
-    
-    let code = generateCodeSecret();
-    db.collection('users').where('code_secret','==',code).get().then(s => {
-        if (!s.empty) code = generateCodeSecret();
-        return db.collection('users').add({
-            nom: nom,
-            role: 'agent',
-            code_secret: code,
-            telephone: tel,
-            dateCreation: new Date()
-        });
-    }).then(() => {
-        playSound('success');
-        showToast(`✅ Agent ajouté ! Code: ${code}`, 'success');
-        if (confirm(`Envoyer le code (${code}) par WhatsApp ?`)) {
-            const phone = tel.replace('+','');
-            window.open(`https://wa.me/${phone}?text=Bonjour ${nom}, votre code agent HDIX est: ${code}`, '_blank');
-        }
-        loadAgents();
-        loadKPI();
-    }).catch(e => { console.error(e); showToast('❌ Erreur.', 'error'); });
-}
-
-async function deleteAgent(id) {
-    playSound('click');
-    if (!confirm('Supprimer cet agent ?')) return;
-    try {
-        await db.collection('users').doc(id).delete();
-        playSound('success');
-        showToast('✅ Agent supprimé.', 'success');
-        loadAgents();
-        loadKPI();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-async function editAgent(id) {
-    playSound('click');
-    const doc = await db.collection('users').doc(id).get();
-    const data = doc.data();
-    const nom = prompt('Nom:', data.nom); if (!nom) return;
-    const tel = prompt('Téléphone:', data.telephone); if (!tel) return;
-    await db.collection('users').doc(id).update({ nom, telephone: tel });
-    playSound('success');
-    showToast('✅ Agent modifié.', 'success');
-    loadAgents();
+    } catch(e) { 
+        console.error('Erreur chargement agents:', e);
+        document.getElementById('agentsList').innerHTML = '<p class="empty-message">❌ Erreur de chargement.</p>';
+    }
 }
 
 async function resetAgentCode(id) {
