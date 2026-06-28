@@ -1725,11 +1725,12 @@ function selectSubSection(section, subSection, element) {
         target.style.display = 'block';
     }
     
-    // Charger les données si besoin
+    // Charger les données
     if (subSection === 'commandes-liste') loadCommandes();
     if (subSection === 'commandes-appels') loadAppels();
     if (subSection === 'commandes-tournees') optimiserTournees();
     if (subSection === 'admin-vendeurs') loadVendeurs();
+    if (subSection === 'admin-agents') loadAgents();  // ← NOUVEAU
     if (subSection === 'admin-livreurs') loadLivreurs();
     if (subSection === 'admin-inscriptions') loadInscriptions();
     if (subSection === 'bilan-kpi') loadKPI();
@@ -1755,4 +1756,103 @@ function showSection(section) {
     
     // Charger les données
     if (section === 'stocks') loadStockage();
+}
+// ========== AGENTS ==========
+async function loadAgents() {
+    try {
+        const snapshot = await db.collection('users').where('role', '==', 'agent').orderBy('nom').get();
+        const container = document.getElementById('agentsList');
+        if (snapshot.empty) {
+            container.innerHTML = '<p class="empty-message">Aucun agent enregistré.</p>';
+            return;
+        }
+        let html = '<div class="list-container">';
+        for (const doc of snapshot.docs) {
+            const data = doc.data();
+            html += `<div class="list-item">
+                <div>
+                    <strong>${data.nom}</strong>
+                    <br><small>📞 ${data.telephone || 'N/A'} | 🔑 ${data.code_secret || 'N/A'}</small>
+                </div>
+                <div>
+                    <button onclick="editAgent('${doc.id}')" class="btn-edit">✏️</button>
+                    <button onclick="deleteAgent('${doc.id}')" class="btn-delete">🗑️</button>
+                    <button onclick="resetAgentCode('${doc.id}')" class="btn-edit" style="background:#fef9e7;">🔑</button>
+                </div>
+            </div>`;
+        }
+        html += '</div>';
+        container.innerHTML = html;
+    } catch(e) { console.error(e); }
+}
+
+function openAgentForm() {
+    playSound('click');
+    const nom = prompt('Nom de l\'agent :');
+    if (!nom) return;
+    const tel = prompt('Téléphone :');
+    if (!tel) return;
+    
+    let code = generateCodeSecret();
+    db.collection('users').where('code_secret','==',code).get().then(s => {
+        if (!s.empty) code = generateCodeSecret();
+        return db.collection('users').add({
+            nom: nom,
+            role: 'agent',
+            code_secret: code,
+            telephone: tel,
+            dateCreation: new Date()
+        });
+    }).then(() => {
+        playSound('success');
+        showToast(`✅ Agent ajouté ! Code: ${code}`, 'success');
+        if (confirm(`Envoyer le code (${code}) par WhatsApp ?`)) {
+            const phone = tel.replace('+','');
+            window.open(`https://wa.me/${phone}?text=Bonjour ${nom}, votre code agent HDIX est: ${code}`, '_blank');
+        }
+        loadAgents();
+        loadKPI();
+    }).catch(e => { console.error(e); showToast('❌ Erreur.', 'error'); });
+}
+
+async function deleteAgent(id) {
+    playSound('click');
+    if (!confirm('Supprimer cet agent ?')) return;
+    try {
+        await db.collection('users').doc(id).delete();
+        playSound('success');
+        showToast('✅ Agent supprimé.', 'success');
+        loadAgents();
+        loadKPI();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
+}
+
+async function editAgent(id) {
+    playSound('click');
+    const doc = await db.collection('users').doc(id).get();
+    const data = doc.data();
+    const nom = prompt('Nom:', data.nom); if (!nom) return;
+    const tel = prompt('Téléphone:', data.telephone); if (!tel) return;
+    await db.collection('users').doc(id).update({ nom, telephone: tel });
+    playSound('success');
+    showToast('✅ Agent modifié.', 'success');
+    loadAgents();
+}
+
+async function resetAgentCode(id) {
+    playSound('click');
+    if (!confirm('Réinitialiser le code secret de cet agent ?')) return;
+    try {
+        const newCode = await generateUniqueCode();
+        await db.collection('users').doc(id).update({ code_secret: newCode });
+        const doc = await db.collection('users').doc(id).get();
+        const data = doc.data();
+        playSound('success');
+        showToast(`✅ Nouveau code: ${newCode}`, 'success');
+        if (confirm(`Envoyer le nouveau code (${newCode}) par WhatsApp ?`)) {
+            const phone = data.telephone.replace('+','');
+            window.open(`https://wa.me/${phone}?text=Bonjour ${data.nom}, votre nouveau code agent HDIX est: ${newCode}`, '_blank');
+        }
+        loadAgents();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
 }

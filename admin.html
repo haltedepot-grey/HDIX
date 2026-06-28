@@ -178,13 +178,14 @@
             <button class="nav-btn" onclick="showSection('stocks')">📦 Stocks</button>
         </div>
 
-        <!-- ONGLET 3 : Administration -->
+        <!-- ONGLET 3 : Administration (4 sous-sections) -->
         <div class="nav-item">
             <button class="nav-btn" onclick="toggleDropdown('administration')">
                 ⚙️ Administration <span class="arrow" id="arrow-administration">▼</span>
             </button>
             <div class="dropdown-menu" id="dropdown-administration">
                 <button class="dropdown-item active" onclick="selectSubSection('administration', 'admin-vendeurs', this)">👤 Vendeurs</button>
+                <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-agents', this)">👨‍💼 Agents</button>
                 <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-livreurs', this)">🚚 Livreurs</button>
                 <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-inscriptions', this)">📝 Inscriptions</button>
             </div>
@@ -274,7 +275,7 @@
     </div>
 
     <!-- ========================================================== -->
-    <!-- SECTION 3 : ADMINISTRATION                                  -->
+    <!-- SECTION 3 : ADMINISTRATION (4 SOUS-SECTIONS)                -->
     <!-- ========================================================== -->
     <div id="section-administration" class="section" style="display:none;">
 
@@ -289,6 +290,16 @@
                 <button onclick="reparerVendeurs()" class="btn-primary" style="flex:1;min-width:150px;background:#8e44ad;">🔧 Réparer les vendeurs</button>
             </div>
             <div id="vendeursList"><div class="spinner" style="margin:30px auto;"></div></div>
+        </div>
+
+        <!-- SOUS-SECTION : Agents -->
+        <div id="sub-admin-agents" class="sub-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+                <h3>👨‍💼 Agents</h3>
+                <button onclick="loadAgents()" class="refresh-btn">🔄</button>
+            </div>
+            <button onclick="openAgentForm()" class="btn-primary" style="margin:12px 0;">➕ Ajouter un agent</button>
+            <div id="agentsList"><div class="spinner" style="margin:30px auto;"></div></div>
         </div>
 
         <!-- SOUS-SECTION : Livreurs -->
