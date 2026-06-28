@@ -1,4 +1,5 @@
-// admin-script.js - Version complète (environ 1000 lignes)
+// admin-script.js - Version complète
+
 // ========== SONS ==========
 let clickSound = null, successSound = null, errorSound = null;
 function loadSounds() {
@@ -41,17 +42,86 @@ function showSection(section) {
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     document.getElementById(`section-${section}`).style.display = 'block';
     document.querySelector(`.nav-btn[onclick="showSection('${section}')"]`).classList.add('active');
-    if (section === 'vendeurs') loadVendeurs();
-    if (section === 'livreurs') loadLivreurs();
-    if (section === 'stockage') loadStockage();
-    if (section === 'inscriptions') loadInscriptions();
-    if (section === 'appels') loadAppels();
-    if (section === 'kpi') loadKPI();
-    if (section === 'commandes') loadCommandes();
-    if (section === 'tournees') optimiserTournees();
+
+    // Charger les données selon la section
+    if (section === 'vendeurs' || section === 'administration') {
+        loadVendeurs();
+        loadLivreurs();
+        loadInscriptions();
+    }
+    if (section === 'commandes') {
+        loadCommandes();
+        loadAppels();
+        optimiserTournees();
+    }
+    if (section === 'stocks') {
+        loadStockage();
+    }
+    if (section === 'bilan') {
+        loadKPI();
+        loadVendeursForBilan();
+        loadTresorerie();
+    }
 }
 
 function logout() { playSound('click'); sessionStorage.removeItem('user'); window.location.href = 'index.html'; }
+
+// ========== GESTION DES DROPDOWNS ==========
+
+// Dropdown Commandes
+function changeCommandeSection(value) {
+    document.querySelectorAll('#section-commandes .sub-section').forEach(el => {
+        el.style.display = 'none';
+        el.classList.remove('active');
+    });
+    const target = document.getElementById(`sub-${value}`);
+    if (target) {
+        target.style.display = 'block';
+        target.classList.add('active');
+    }
+    document.getElementById('commandesDropdown').value = value;
+
+    // Charger les données selon la sous-section
+    if (value === 'commandes-liste') loadCommandes();
+    if (value === 'commandes-appels') loadAppels();
+    if (value === 'commandes-tournees') optimiserTournees();
+}
+
+// Dropdown Administration
+function changeAdminSection(value) {
+    document.querySelectorAll('#section-administration .sub-section').forEach(el => {
+        el.style.display = 'none';
+        el.classList.remove('active');
+    });
+    const target = document.getElementById(`sub-${value}`);
+    if (target) {
+        target.style.display = 'block';
+        target.classList.add('active');
+    }
+    document.getElementById('adminDropdown').value = value;
+
+    if (value === 'admin-vendeurs') loadVendeurs();
+    if (value === 'admin-livreurs') loadLivreurs();
+    if (value === 'admin-inscriptions') loadInscriptions();
+}
+
+// Dropdown Bilan
+function changeBilanSection(value) {
+    document.querySelectorAll('#section-bilan .sub-section').forEach(el => {
+        el.style.display = 'none';
+        el.classList.remove('active');
+    });
+    const target = document.getElementById(`sub-${value}`);
+    if (target) {
+        target.style.display = 'block';
+        target.classList.add('active');
+    }
+    document.getElementById('bilanDropdown').value = value;
+
+    if (value === 'bilan-kpi') loadKPI();
+    if (value === 'bilan-general') loadVendeursForBilan();
+    if (value === 'bilan-tresorerie') loadTresorerie();
+}
 
 // ========== KPI ==========
 async function loadKPI() {
@@ -73,10 +143,6 @@ async function loadKPI() {
         document.getElementById('kpiTauxLivraison').textContent = tx + '%';
         const moy = livree > 0 ? Math.round(ca/livree) : 0;
         document.getElementById('kpiMoyenne').textContent = formatNumber(moy);
-        document.getElementById('kpiTotalTrend').textContent = '▲ ' + (total > 0 ? Math.round(Math.random()*20) : 0) + '%';
-        document.getElementById('kpiAppelerTrend').textContent = '▲ ' + (appeler > 0 ? Math.round(Math.random()*15) : 0) + '%';
-        document.getElementById('kpiLivreeTrend').textContent = '▲ ' + (livree > 0 ? Math.round(Math.random()*25) : 0) + '%';
-        document.getElementById('kpiCATrend').textContent = '▲ ' + (ca > 0 ? Math.round(Math.random()*30) : 0) + '%';
     } catch(e) { console.error(e); }
     hideSpinner();
 }
@@ -1009,9 +1075,7 @@ async function loadInscriptions() {
     try {
         const container = document.getElementById('inscriptionsList');
         container.innerHTML = '<div class="spinner" style="margin:20px auto;"></div>';
-        const snapshot = await db.collection('inscriptions')
-            .orderBy('dateDemande', 'desc')
-            .get();
+        const snapshot = await db.collection('inscriptions').orderBy('dateDemande', 'desc').get();
         if (snapshot.empty) {
             container.innerHTML = '<p class="empty-message">Aucune demande d\'inscription.</p>';
             return;
@@ -1028,10 +1092,8 @@ async function loadInscriptions() {
         snapshot.forEach(doc => {
             const data = doc.data();
             const statut = data.statut || 'en_attente';
-            const statutClass = statut === 'acceptée' ? 'statut-livree' : 
-                               statut === 'refusée' ? 'statut-indisponible' : 'statut-appel';
-            const statutLabel = statut === 'acceptée' ? '✅ Acceptée' : 
-                               statut === 'refusée' ? '❌ Refusée' : '⏳ En attente';
+            const statutClass = statut === 'acceptée' ? 'statut-livree' : statut === 'refusée' ? 'statut-indisponible' : 'statut-appel';
+            const statutLabel = statut === 'acceptée' ? '✅ Acceptée' : statut === 'refusée' ? '❌ Refusée' : '⏳ En attente';
             const code = statut === 'acceptée' && data.codeSecret ? data.codeSecret : '';
             const telephone = data.telephone || '';
             html += `
@@ -1062,12 +1124,7 @@ async function loadInscriptions() {
         container.innerHTML = html;
     } catch (error) {
         console.error('Erreur inscriptions:', error);
-        document.getElementById('inscriptionsList').innerHTML = `
-            <p class="empty-message" style="color:#c0392b;">
-                ❌ Erreur : ${error.message}
-                <br><button onclick="loadInscriptions()" class="btn-secondary" style="margin-top:10px;padding:6px 14px;">🔄 Réessayer</button>
-            </p>
-        `;
+        document.getElementById('inscriptionsList').innerHTML = `<p class="empty-message" style="color:#c0392b;">❌ Erreur : ${error.message}</p>`;
     }
 }
 
@@ -1075,7 +1132,7 @@ function copierCode(code) {
     playSound('click');
     navigator.clipboard.writeText(code).then(() => {
         playSound('success');
-        showToast(`✅ Code "${code}" copié dans le presse-papiers !`, 'success');
+        showToast(`✅ Code "${code}" copié !`, 'success');
     }).catch(() => {
         const textarea = document.createElement('textarea');
         textarea.value = code;
@@ -1089,31 +1146,21 @@ function copierCode(code) {
 
 function envoyerCodeWhatsApp(code, telephone, nom) {
     playSound('click');
-    if (!telephone) {
-        showToast('⚠️ Numéro de téléphone manquant.', 'error');
-        return;
-    }
+    if (!telephone) { showToast('⚠️ Numéro manquant.', 'error'); return; }
     const phone = telephone.replace(/[^0-9+]/g, '');
-    const message = `Bonjour ${nom || 'cher(e) client(e)'},\n\nVotre compte HDIX a été activé.\n\n🔑 Votre code secret : ${code}\n\n📱 Lien de connexion : https://hdix.vercel.app\n\nMerci de votre confiance ! 🚀`;
+    const message = `Bonjour ${nom || 'client'},\n\nVotre compte HDIX a été activé.\n🔑 Code : ${code}\n\nLien : https://hdix.vercel.app`;
     const url = `https://wa.me/${phone.replace('+', '')}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
-    showToast('💬 Ouverture de WhatsApp...', 'info');
+    showToast('💬 Ouverture WhatsApp...', 'info');
 }
 
 let filtreInscriptions = 'toutes';
-
 function filtrerInscriptions(statut) {
     playSound('click');
     filtreInscriptions = statut;
-    document.querySelectorAll('#inscriptionsList .filter-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.filter === statut);
-    });
+    document.querySelectorAll('#inscriptionsList .filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === statut));
     document.querySelectorAll('.inscription-item').forEach(el => {
-        if (statut === 'toutes') {
-            el.style.display = 'flex';
-        } else {
-            el.style.display = el.dataset.statut === statut ? 'flex' : 'none';
-        }
+        el.style.display = statut === 'toutes' || el.dataset.statut === statut ? 'flex' : 'none';
     });
 }
 
@@ -1124,27 +1171,35 @@ async function accepterInscription(id) {
         const doc = await db.collection('inscriptions').doc(id).get();
         const data = doc.data();
         const code = await generateUniqueCode();
-        await db.collection('inscriptions').doc(id).update({
-            statut: 'acceptée',
-            dateTraitement: new Date(),
-            codeSecret: code
+        const vendeurRef = await db.collection('vendeurs').add({
+            nom: data.nom,
+            telephone: data.telephone,
+            abreviation: data.abreviation || 'VEN' + Math.floor(Math.random() * 1000),
+            dateCreation: new Date()
         });
         await db.collection('users').add({
             nom: data.nom,
-            prenom: data.prenom || '',
-            telephone: data.telephone,
-            role: data.role,
+            role: data.role || 'vendeur',
             code_secret: code,
+            telephone: data.telephone,
+            vendeurId: vendeurRef.id,
             boutique: data.boutique || '',
             dateCreation: new Date()
+        });
+        await db.collection('inscriptions').doc(id).update({
+            statut: 'acceptée',
+            dateTraitement: new Date(),
+            codeSecret: code,
+            vendeurId: vendeurRef.id
         });
         playSound('success');
         showToast(`✅ Inscription acceptée ! Code: ${code}`, 'success');
         loadInscriptions();
+        loadVendeurs();
         loadKPI();
     } catch (error) {
         console.error('Erreur acceptation:', error);
-        showToast('❌ Erreur lors de l\'acceptation.', 'error');
+        showToast('❌ Erreur acceptation.', 'error');
     }
 }
 
@@ -1162,7 +1217,7 @@ async function refuserInscription(id) {
         loadInscriptions();
     } catch (error) {
         console.error('Erreur refus:', error);
-        showToast('❌ Erreur lors du refus.', 'error');
+        showToast('❌ Erreur refus.', 'error');
     }
 }
 
@@ -1237,7 +1292,7 @@ async function copyBilan() {
 
 async function generatePDF() {
     playSound('click');
-    showToast('📄 Fonctionnalité PDF bientôt disponible.', 'info');
+    showToast('📄 PDF bientôt disponible.', 'info');
 }
 
 async function envoyerBilanWhatsApp() {
@@ -1265,7 +1320,6 @@ async function envoyerBilanWhatsApp() {
 async function generateMonthlyReport() {
     playSound('click');
     showToast('📊 Rapport mensuel bientôt disponible.', 'info');
-    document.getElementById('monthlyReportContainer').innerHTML = '<div class="bilan-result"><h4>📈 Rapport mensuel</h4><p>Fonctionnalité en développement.</p></div>';
 }
 
 // ========== TOURNÉES ==========
@@ -1417,6 +1471,145 @@ async function retirerStock(id) {
     } catch(e) { console.error(e); showToast('❌ Erreur retrait.', 'error'); }
 }
 
+// ========== TRÉSORERIE ==========
+async function loadTresorerie() {
+    try {
+        // Solde
+        const soldeSnap = await db.collection('tresorerie').orderBy('date', 'desc').limit(1).get();
+        let solde = 0;
+        if (!soldeSnap.empty) { solde = soldeSnap.docs[0].data().solde || 0; }
+        document.getElementById('soldeDisplay').textContent = formatNumber(solde) + ' FCFA';
+
+        // Airtel
+        const configSnap = await db.collection('tresorerie_config').doc('config').get();
+        if (configSnap.exists) {
+            document.getElementById('airtelDisplay').textContent = configSnap.data().airtel_numero || '+241 66 12 34 56';
+        }
+
+        // Transactions
+        const snapshot = await db.collection('tresorerie').orderBy('date', 'desc').get();
+        const container = document.getElementById('transactionsContainer');
+        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune transaction.</p>'; return; }
+        let html = '';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const type = data.type || 'depot';
+            const typeClass = type === 'depot' ? 'type-depot' : type === 'retrait' ? 'type-retrait' : 'type-airtel';
+            const typeLabel = type === 'depot' ? '📥 Dépôt' : type === 'retrait' ? '📤 Retrait' : '📱 Airtel';
+            const montantClass = type === 'depot' ? 'montant-depot' : 'montant-retrait';
+            const signe = type === 'depot' ? '+' : '-';
+            const date = data.date ? new Date(data.date.seconds * 1000) : new Date();
+            html += `<div class="transaction-item">
+                <div>
+                    <span class="type ${typeClass}">${typeLabel}</span>
+                    <span style="font-size:13px;color:#6b7a8f;margin-left:8px;">${date.toLocaleDateString()}</span>
+                    ${data.description ? `<br><small style="color:#6b7a8f;">${data.description}</small>` : ''}
+                    ${data.mode && data.mode !== 'especes' ? `<br><small style="color:#6b7a8f;">${data.mode.replace('_', ' ').toUpperCase()}</small>` : ''}
+                </div>
+                <div class="${montantClass}">${signe} ${formatNumber(data.montant)} FCFA</div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    } catch(e) { console.error('Erreur trésorerie:', e); }
+}
+
+function filtrerTransactions(type) {
+    playSound('click');
+    document.querySelectorAll('#sub-bilan-tresorerie .filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === type));
+    loadTresorerie();
+}
+
+function openDepotModal() {
+    playSound('click');
+    document.getElementById('depotModal').classList.add('active');
+    document.getElementById('depotMontant').value = '';
+    document.getElementById('depotDescription').value = '';
+    document.getElementById('depotMode').value = 'especes';
+}
+
+function closeDepotModal() { document.getElementById('depotModal').classList.remove('active'); }
+
+async function enregistrerDepot() {
+    playSound('click');
+    const montant = parseInt(document.getElementById('depotMontant').value);
+    if (isNaN(montant) || montant <= 0) { showToast('⚠️ Montant invalide.', 'error'); return; }
+    const mode = document.getElementById('depotMode').value;
+    const description = document.getElementById('depotDescription').value.trim() || 'Dépôt';
+    try {
+        const soldeDoc = await db.collection('tresorerie').orderBy('date', 'desc').limit(1).get();
+        let solde = 0;
+        if (!soldeDoc.empty) { solde = soldeDoc.docs[0].data().solde || 0; }
+        const nouveauSolde = solde + montant;
+        await db.collection('tresorerie').add({
+            type: 'depot',
+            montant: montant,
+            mode: mode,
+            description: description,
+            solde: nouveauSolde,
+            date: new Date()
+        });
+        playSound('success');
+        showToast(`✅ Dépôt de ${formatNumber(montant)} FCFA enregistré !`, 'success');
+        closeDepotModal();
+        loadTresorerie();
+    } catch(e) { showToast('❌ Erreur dépôt.', 'error'); }
+}
+
+function openRetraitModal() {
+    playSound('click');
+    document.getElementById('retraitModal').classList.add('active');
+    document.getElementById('retraitMontant').value = '';
+    document.getElementById('retraitDescription').value = '';
+    document.getElementById('retraitMode').value = 'especes';
+}
+
+function closeRetraitModal() { document.getElementById('retraitModal').classList.remove('active'); }
+
+async function enregistrerRetrait() {
+    playSound('click');
+    const montant = parseInt(document.getElementById('retraitMontant').value);
+    if (isNaN(montant) || montant <= 0) { showToast('⚠️ Montant invalide.', 'error'); return; }
+    const mode = document.getElementById('retraitMode').value;
+    const description = document.getElementById('retraitDescription').value.trim() || 'Retrait';
+    try {
+        const soldeDoc = await db.collection('tresorerie').orderBy('date', 'desc').limit(1).get();
+        let solde = 0;
+        if (!soldeDoc.empty) { solde = soldeDoc.docs[0].data().solde || 0; }
+        if (solde < montant) { showToast('⚠️ Solde insuffisant.', 'error'); return; }
+        const nouveauSolde = solde - montant;
+        await db.collection('tresorerie').add({
+            type: 'retrait',
+            montant: montant,
+            mode: mode,
+            description: description,
+            solde: nouveauSolde,
+            date: new Date()
+        });
+        playSound('success');
+        showToast(`✅ Retrait de ${formatNumber(montant)} FCFA enregistré !`, 'success');
+        closeRetraitModal();
+        loadTresorerie();
+    } catch(e) { showToast('❌ Erreur retrait.', 'error'); }
+}
+
+function ouvrirAirtel() {
+    playSound('click');
+    const numero = document.getElementById('airtelDisplay').textContent.trim();
+    if (numero) {
+        const phone = numero.replace(/[^0-9+]/g, '');
+        navigator.clipboard.writeText(phone).then(() => {
+            showToast(`✅ Numéro ${numero} copié !`, 'success');
+        });
+    } else {
+        showToast('⚠️ Numéro Airtel non configuré.', 'error');
+    }
+}
+
+function exporterTransactions() {
+    playSound('click');
+    showToast('📊 Export bientôt disponible.', 'info');
+}
+
 // ========== UTILITAIRES ==========
 function generateCodeSecret() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -1458,12 +1651,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('adminName').textContent = u.nom || 'Admin';
         if (u.role !== 'admin') { window.location.href = 'index.html'; return; }
     } catch { window.location.href = 'index.html'; return; }
-    loadKPI();
-    loadCommandes();
-    loadAppels();
-    loadVendeursForBilan();
-    loadVendeurs();
 
+    // Charger la section par défaut (Commandes)
+    showSection('commandes');
+
+    // Fermer les modales en cliquant sur le fond
     document.getElementById('commandeModal').addEventListener('click', function(e) {
         if (e.target === this) closeCommandeModal();
     });
@@ -1481,5 +1673,11 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     document.getElementById('collageConfirmationModal').addEventListener('click', function(e) {
         if (e.target === this) closeCollageConfirmation();
+    });
+    document.getElementById('depotModal').addEventListener('click', function(e) {
+        if (e.target === this) closeDepotModal();
+    });
+    document.getElementById('retraitModal').addEventListener('click', function(e) {
+        if (e.target === this) closeRetraitModal();
     });
 });
