@@ -15,20 +15,140 @@
     <meta name="theme-color" content="#1a2b4c" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" href="style.css" />
+
+    <style>
+        .inscription-form {
+            display: none;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+        }
+        .inscription-form.active {
+            display: block;
+        }
+        .inscription-form .form-group {
+            margin-bottom: 12px;
+        }
+        .inscription-form label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+        .inscription-form select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 16px;
+            outline: none;
+            background: white;
+        }
+        .btn-inscription {
+            width: 100%;
+            padding: 14px;
+            background: #2d7d46;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-inscription:hover {
+            background: #3a8d56;
+        }
+        .btn-inscription:active {
+            transform: scale(0.98);
+        }
+        .link-inscription {
+            color: #1a2b4c;
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: underline;
+        }
+        .link-inscription:hover {
+            color: #2a3b5c;
+        }
+        .login-toggle {
+            text-align: center;
+            margin-top: 12px;
+            font-size: 14px;
+            color: #6b7a8f;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 1000;
+            max-width: 90%;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            animation: slideUp 0.4s ease;
+        }
+        .toast-success {
+            background: #2d7d46;
+            color: white;
+        }
+        .toast-error {
+            background: #c0392b;
+            color: white;
+        }
+        .toast-info {
+            background: #1a2b4c;
+            color: white;
+        }
+        @keyframes slideUp {
+            from { transform: translateX(-50%) translateY(40px); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0); opacity: 1; }
+        }
+        .input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .input-group input {
+            flex: 1;
+            padding-right: 50px;
+        }
+        .input-group .toggle-btn {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px 8px;
+            color: #6b7a8f;
+            transition: color 0.2s;
+        }
+        .input-group .toggle-btn:hover {
+            color: #1a2b4c;
+        }
+    </style>
 </head>
 <body>
 
-    <!-- SPLASH SCREEN -->
+    <!-- ========== SPLASH SCREEN ========== -->
     <div class="splash-screen" id="splash">
-        <img src="assets/splash.png" alt="HDIX" style="background:#f5f7fa;padding:8px;border-radius:24px;" />
+        <img src="assets/splash.png" alt="HDIX" />
         <h1>HDIX</h1>
         <p>Halte-Dépôt · Gestion logistique</p>
     </div>
 
+    <!-- ========== PAGE DE CONNEXION ========== -->
     <div class="container">
         <div class="login-card">
             <div class="logo">
@@ -37,6 +157,7 @@
                 <p class="subtitle">Halte-Dépôt · Gestion logistique</p>
             </div>
 
+            <!-- Formulaire de connexion -->
             <div id="loginForm" class="login-form">
                 <h2>🔐 Connexion</h2>
                 <p class="info-text">Saisissez votre code secret à 8 caractères</p>
@@ -49,7 +170,6 @@
                 </div>
 
                 <button onclick="login()" class="btn-primary">Se connecter</button>
-
                 <p id="loginMessage" class="error-message"></p>
 
                 <div class="login-toggle">
@@ -57,6 +177,7 @@
                 </div>
             </div>
 
+            <!-- Formulaire d'inscription -->
             <div id="inscriptionForm" class="inscription-form">
                 <h2>📝 Inscription</h2>
                 <p class="info-text">Créez votre compte. L'admin validera votre demande.</p>
@@ -91,7 +212,6 @@
                 </div>
 
                 <button onclick="submitInscription()" class="btn-inscription">📤 Envoyer la demande</button>
-
                 <p id="inscriptionMessage" class="error-message"></p>
 
                 <div class="login-toggle">
@@ -103,7 +223,9 @@
 
     <script src="firebase-config.js"></script>
     <script>
-        // ========== SONS PERSONNALISÉS ==========
+        // ============================================================
+        // SONS PERSONNALISÉS (CORRIGÉS - plus de décalage)
+        // ============================================================
         let clickSound = null;
         let successSound = null;
         let errorSound = null;
@@ -113,11 +235,20 @@
                 clickSound = new Audio('assets/sounds/click.mp3');
                 successSound = new Audio('assets/sounds/success.mp3');
                 errorSound = new Audio('assets/sounds/error.mp3');
+
+                // Préchargement pour éviter le délai
                 clickSound.load();
                 successSound.load();
                 errorSound.load();
+
+                // Volume ajusté
+                clickSound.volume = 0.6;
+                successSound.volume = 0.5;
+                errorSound.volume = 0.5;
+
+                console.log('✅ Sons chargés avec succès');
             } catch(e) {
-                console.log('Sons non disponibles');
+                console.log('⚠️ Sons non disponibles');
             }
         }
 
@@ -133,19 +264,26 @@
                     errorSound.currentTime = 0;
                     errorSound.play().catch(e => {});
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.log('Erreur lecture son:', e);
+            }
         }
 
+        // Charger les sons au démarrage
         loadSounds();
 
-        // ========== TOAST ==========
+        // ============================================================
+        // TOAST
+        // ============================================================
         function showToast(message, type) {
             const existing = document.querySelector('.toast');
             if (existing) existing.remove();
+
             const toast = document.createElement('div');
             toast.className = `toast toast-${type}`;
             toast.textContent = message;
             document.body.appendChild(toast);
+
             setTimeout(() => {
                 toast.style.opacity = '0';
                 toast.style.transition = 'opacity 0.3s';
@@ -153,7 +291,9 @@
             }, 4000);
         }
 
-        // ========== VOIR/CACHER CODE ==========
+        // ============================================================
+        // VOIR/CACHER LE CODE SECRET
+        // ============================================================
         let codeVisible = false;
 
         function toggleCodeVisibility() {
@@ -173,7 +313,9 @@
             input.focus();
         }
 
-        // ========== TOGGLE INSCRIPTION ==========
+        // ============================================================
+        // TOGGLE INSCRIPTION
+        // ============================================================
         function toggleInscription() {
             playSound('click');
             const loginForm = document.getElementById('loginForm');
@@ -187,11 +329,14 @@
                 loginForm.style.display = 'block';
                 inscriptionForm.classList.remove('active');
             }
+
             document.getElementById('loginMessage').textContent = '';
             document.getElementById('inscriptionMessage').textContent = '';
         }
 
-        // ========== LOGIN ==========
+        // ============================================================
+        // LOGIN
+        // ============================================================
         async function login() {
             const code = document.getElementById('codeSecret').value.trim();
             const message = document.getElementById('loginMessage');
@@ -234,7 +379,9 @@
             }
         }
 
-        // ========== INSCRIPTION ==========
+        // ============================================================
+        // INSCRIPTION
+        // ============================================================
         async function submitInscription() {
             playSound('click');
 
@@ -267,15 +414,18 @@
             }
 
             try {
+                // Vérifier si le téléphone existe déjà
                 const existing = await db.collection('users')
                     .where('telephone', '==', telephone)
                     .get();
+
                 if (!existing.empty) {
                     playSound('error');
                     message.textContent = '⚠️ Ce numéro est déjà enregistré.';
                     return;
                 }
 
+                // Envoyer la demande d'inscription
                 await db.collection('inscriptions').add({
                     nom: nom,
                     role: role,
@@ -290,11 +440,13 @@
                 showToast('✅ Demande envoyée ! Vous recevrez votre code par WhatsApp.', 'success');
                 message.textContent = '✅ Demande envoyée avec succès ! L\'admin vous contactera.';
 
+                // Réinitialiser le formulaire
                 document.getElementById('inscriptionNom').value = '';
                 document.getElementById('inscriptionBoutique').value = '';
                 document.getElementById('inscriptionTelephone').value = '';
                 document.getElementById('inscriptionAbreviation').value = '';
 
+                // Basculer vers la connexion après 3 secondes
                 setTimeout(() => {
                     toggleInscription();
                 }, 3000);
@@ -306,6 +458,9 @@
             }
         }
 
+        // ============================================================
+        // RACCOURCIS CLAVIER
+        // ============================================================
         document.getElementById('codeSecret').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') login();
         });
@@ -314,8 +469,18 @@
             this.value = this.value.toUpperCase();
         });
 
-        // ========== SPLASH SCREEN ==========
-        // Masquer le splash screen après 2 secondes ou quand la page est chargée
+        // ============================================================
+        // FERMER LES MODALES EN CLIQUANT SUR LE FOND
+        // ============================================================
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal')) {
+                e.target.classList.remove('active');
+            }
+        });
+
+        // ============================================================
+        // SPLASH SCREEN : MASQUER APRÈS 2 SECONDES
+        // ============================================================
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(function() {
                 const splash = document.getElementById('splash');
@@ -323,7 +488,6 @@
             }, 2000);
         });
 
-        // Fallback : si la page est déjà chargée, masquer après 2s
         if (document.readyState === 'complete') {
             setTimeout(function() {
                 const splash = document.getElementById('splash');

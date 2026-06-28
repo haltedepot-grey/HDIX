@@ -43,7 +43,7 @@ body {
     justify-content: center;
     z-index: 9999;
     flex-direction: column;
-    transition: opacity 0.5s ease;
+    transition: opacity 0.6s ease;
 }
 
 .splash-screen.hidden {
@@ -52,13 +52,14 @@ body {
 }
 
 .splash-screen img {
-    width: 150px;
-    height: 150px;
+    width: 160px;
+    height: 160px;
     object-fit: contain;
-    background: #f5f7fa;
-    border-radius: 24px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-    animation: pulse 1.2s ease-in-out infinite;
+    background: #ffffff;
+    padding: 12px;
+    border-radius: 32px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.10);
+    animation: pulse 1.4s ease-in-out infinite;
 }
 
 .splash-screen h1 {
@@ -66,6 +67,7 @@ body {
     color: #1a2b4c;
     margin-top: 16px;
     letter-spacing: 2px;
+    font-weight: 700;
 }
 
 .splash-screen p {
@@ -76,7 +78,7 @@ body {
 
 @keyframes pulse {
     0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
+    50% { transform: scale(1.04); }
     100% { transform: scale(1); }
 }
 
