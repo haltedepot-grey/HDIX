@@ -2,7 +2,7 @@
   "name": "HDIX - Halte-Dépôt",
   "short_name": "HDIX",
   "description": "Application de gestion logistique Halte-Dépôt",
-  "start_url": "splash.html",
+  "start_url": "index.html",
   "display": "standalone",
   "background_color": "#f5f7fa",
   "theme_color": "#1a2b4c",
