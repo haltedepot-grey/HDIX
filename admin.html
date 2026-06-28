@@ -21,7 +21,6 @@
 <body>
 <div class="app-container">
 
-    <!-- EN-TÊTE AVEC LOGO -->
     <header class="admin-header">
         <div class="header-left">
             <div class="header-logo">
@@ -137,7 +136,8 @@
         <button onclick="appliquerPenalites()" class="btn-danger" style="margin:12px 0;">⚠️ Appliquer pénalités</button>
         <div id="stockageList"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
-        <!-- SECTION BILAN -->
+
+    <!-- SECTION BILAN -->
     <div id="section-bilan" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📊 Bilan</h3><button onclick="loadVendeursForBilan()" class="refresh-btn">🔄</button></div>
         <div class="bilan-section">
@@ -171,8 +171,6 @@
 
 </div>
 
-<!-- ========== MODALES ========== -->
-
 <!-- MODALE NOUVELLE COMMANDE -->
 <div class="modal" id="commandeModal">
     <div class="modal-content">
@@ -196,9 +194,24 @@
             <button onclick="saveCommande()" class="btn-primary btn-success" style="width:100%;padding:12px;">✅ Enregistrer</button>
         </div>
         <div id="modeCollage" style="display:none;">
-            <div class="collage-zone"><textarea id="collageInput" rows="6" placeholder="Collez le bon de commande ici..."></textarea></div>
-            <button onclick="analyserCollage()" class="btn-collage" style="width:100%;padding:12px;">🔍 Analyser</button>
+            <div class="collage-zone">
+                <textarea id="collageInput" rows="6" placeholder="Collez le bon de commande ici..."></textarea>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:8px;">
+                <button onclick="collerTexte()" class="btn-secondary" style="flex:1;">📋 Coller</button>
+                <button onclick="analyserCollage()" class="btn-collage" style="flex:1;">🔍 Analyser</button>
+            </div>
             <div id="collageResult" style="margin-top:16px;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- MODALE CONFIRMATION COLLAGE -->
+<div class="modal" id="collageConfirmationModal">
+    <div class="modal-content" style="max-width:550px;">
+        <button class="modal-close" onclick="closeCollageConfirmation()">✕</button>
+        <div id="collageConfirmationContent">
+            <div class="spinner" style="margin:20px auto;"></div>
         </div>
     </div>
 </div>

@@ -1,4 +1,4 @@
-// admin-script.js - Version complète avec formatage, téléphone client et modale
+// admin-script.js - Version complète avec mode Collage corrigé
 
 // ========== SONS PERSONNALISÉS ==========
 let clickSound = null;
@@ -13,6 +13,9 @@ function loadSounds() {
         clickSound.load();
         successSound.load();
         errorSound.load();
+        clickSound.volume = 0.6;
+        successSound.volume = 0.5;
+        errorSound.volume = 0.5;
     } catch(e) {
         console.log('Sons non disponibles');
     }
@@ -50,7 +53,7 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
-// ========== FORMATAGE DES NOMBRES ==========
+// ========== FORMATAGE ==========
 function formatNumber(num) {
     if (num === undefined || num === null) return '0';
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
@@ -167,6 +170,7 @@ function filtrerCommandes(statut) {
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === statut));
     loadCommandes();
 }
+
 // ========== MODALE NOUVELLE COMMANDE ==========
 async function openCommandeModal(commandeId) {
     playSound('click');
@@ -276,71 +280,279 @@ async function saveCommande() {
 }
 
 // ========== COLLAGE ==========
-function analyserCollage() {
-    const text = document.getElementById('collageInput').value.trim();
-    if (!text) { showToast('⚠️ Collez un texte.', 'error'); return; }
-    const result = analyserTexte(text);
-    const container = document.getElementById('collageResult');
-    if (result.articles.length === 0) {
-        container.innerHTML = '<div class="required-note" style="border-left-color:#c0392b;">⚠️ Aucun article détecté.</div>';
-        return;
-    }
-    let html = `<div style="margin-top:16px;"><h4>📋 Commande détectée</h4><div class="recap-item"><span>Vendeur</span><span>${result.vendeur||'Non détecté'}</span></div>
-        <div class="recap-item"><span>Articles</span><span>${result.articles.length}</span></div>
-        <div class="recap-item" style="flex-direction:column;align-items:flex-start;padding:8px 0;">
-        <strong>Détail :</strong><span>${result.articles.map(a=>`${a.quantite} x ${a.nom}`).join('<br>')}</span></div>
-        <div class="recap-item"><span>Prix</span><span>${result.prix||'Non détecté'} FCFA</span></div>
-        <div class="recap-item"><span>Lieu</span><span>${result.lieu||'Non détecté'}</span></div>
-        <div style="margin-top:16px;display:flex;gap:10px;"><button onclick="validerCollage()" class="btn-success" style="flex:1;padding:12px;">✅ Valider</button>
-        <button onclick="closeCommandeModal()" class="btn-secondary" style="flex:1;padding:12px;">Annuler</button></div></div>`;
-    container.innerHTML = html;
-    window._collageResult = result;
+function collerTexte() {
+    playSound('click');
+    navigator.clipboard.readText().then(text => {
+        document.getElementById('collageInput').value = text;
+        showToast('✅ Texte collé ! Analyse automatique en cours...', 'success');
+        setTimeout(() => {
+            analyserCollage();
+        }, 300);
+    }).catch(err => {
+        showToast('⚠️ Impossible d\'accéder au presse-papiers. Collez manuellement (Ctrl+V).', 'error');
+        document.getElementById('collageInput').focus();
+    });
 }
 
-function validerCollage() {
-    const result = window._collageResult;
-    if (!result) return;
-    const container = document.getElementById('articlesContainer');
-    container.innerHTML = '';
-    result.articles.forEach(a => {
-        const row = document.createElement('div');
-        row.className = 'article-row';
-        row.innerHTML = `<input type="number" class="article-qty" value="${a.quantite}" min="1" /><input type="text" class="article-name" value="${a.nom}" />`;
-        container.appendChild(row);
-    });
-    if (result.prix) document.getElementById('commandePrix').value = result.prix;
-    if (result.lieu) {
-        const parts = result.lieu.split(',');
-        if (parts.length >= 2) {
-            document.getElementById('commandeQuartier').value = parts[0].trim();
-            document.getElementById('commandeVille').value = parts[1].trim();
-        } else { document.getElementById('commandeQuartier').value = result.lieu; }
+function analyserCollage() {
+    const text = document.getElementById('collageInput').value.trim();
+    if (!text) {
+        showToast('⚠️ Collez un texte.', 'error');
+        return;
     }
-    if (result.vendeur) {
-        const select = document.getElementById('commandeVendeurSelect');
-        for(let i=0; i<select.options.length; i++) {
-            if(select.options[i].textContent === result.vendeur) { select.value = select.options[i].value; break; }
+
+    const result = analyserTexte(text);
+    if (result.articles.length === 0) {
+        showToast('⚠️ Aucun article détecté. Vérifiez le format.', 'error');
+        return;
+    }
+
+    afficherConfirmationCollage(result);
+}
+
+function afficherConfirmationCollage(result) {
+    const modal = document.getElementById('collageConfirmationModal');
+    const content = document.getElementById('collageConfirmationContent');
+
+    let articlesHtml = result.articles.map((a, idx) => `
+        <div style="display:flex;gap:8px;margin-bottom:4px;">
+            <input type="number" value="${a.quantite}" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-qty" />
+            <input type="text" value="${a.nom}" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-name" />
+        </div>
+    `).join('');
+
+    loadVendeursForSelect('collageVendeurSelect').then(() => {
+        if (result.vendeur) {
+            const select = document.getElementById('collageVendeurSelect');
+            for (let i = 0; i < select.options.length; i++) {
+                if (select.options[i].textContent === result.vendeur) {
+                    select.value = select.options[i].value;
+                    break;
+                }
+            }
+        }
+    });
+
+    content.innerHTML = `
+        <div class="step-title">📋 CONFIRMER LA COMMANDE</div>
+        <div class="step-subtitle">Vérifiez les informations détectées</div>
+
+        <div class="vendeur-select-row">
+            <label>Vendeur *</label>
+            <select id="collageVendeurSelect">
+                <option value="">-- Sélectionnez un vendeur --</option>
+            </select>
+        </div>
+
+        <div style="margin:12px 0;">
+            <label style="font-weight:500;">Articles</label>
+            <div id="collageArticlesContainer">${articlesHtml}</div>
+            <button onclick="ajouterLigneArticleCollage()" class="add-article-btn" style="margin-top:6px;">+ Ajouter un article</button>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <div style="flex:1;">
+                <label style="font-weight:500;">💰 Prix total (FCFA)</label>
+                <input type="number" id="collagePrix" value="${result.prix || ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" />
+            </div>
+            <div style="flex:1;">
+                <label style="font-weight:500;">🚚 Frais livraison</label>
+                <input type="number" id="collageFrais" value="${result.frais || 0}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" />
+            </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+            <div style="flex:1;">
+                <label style="font-weight:500;">📍 Quartier</label>
+                <input type="text" id="collageQuartier" value="${result.lieu ? result.lieu.split(',')[0].trim() : ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" />
+            </div>
+            <div style="flex:1;">
+                <label style="font-weight:500;">Ville</label>
+                <input type="text" id="collageVille" value="${result.lieu && result.lieu.includes(',') ? result.lieu.split(',')[1].trim() : ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" />
+            </div>
+        </div>
+
+        <div style="margin-top:8px;">
+            <label style="font-weight:500;">📞 Téléphone client</label>
+            <input type="tel" id="collageTelephone" value="${result.telephone || ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" />
+        </div>
+
+        <div style="margin-top:8px;">
+            <label style="font-weight:500;">📝 Note (optionnel)</label>
+            <input type="text" id="collageNote" value="${result.note || ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" />
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:10px;">
+            <button onclick="enregistrerCollage()" class="btn-success" style="flex:1;padding:12px;">✅ Enregistrer</button>
+            <button onclick="closeCollageConfirmation()" class="btn-secondary" style="flex:1;padding:12px;">Annuler</button>
+        </div>
+    `;
+
+    window._collageResult = result;
+    modal.classList.add('active');
+}
+
+function ajouterLigneArticleCollage() {
+    const container = document.getElementById('collageArticlesContainer');
+    const idx = container.querySelectorAll('.conf-qty').length;
+    const div = document.createElement('div');
+    div.style.display = 'flex';
+    div.style.gap = '8px';
+    div.style.marginBottom = '4px';
+    div.innerHTML = `
+        <input type="number" value="1" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-qty" />
+        <input type="text" value="" placeholder="Nom de l'article" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-name" />
+    `;
+    container.appendChild(div);
+}
+
+async function enregistrerCollage() {
+    playSound('click');
+
+    const vendeurSelect = document.getElementById('collageVendeurSelect');
+    const vendeurId = vendeurSelect.value;
+    if (!vendeurId) {
+        showToast('⚠️ Veuillez sélectionner un vendeur.', 'error');
+        return;
+    }
+    const vendeurNom = vendeurSelect.options[vendeurSelect.selectedIndex].textContent;
+
+    const qtyInputs = document.querySelectorAll('.conf-qty');
+    const nameInputs = document.querySelectorAll('.conf-name');
+    const articles = [];
+    for (let i = 0; i < qtyInputs.length; i++) {
+        const nom = nameInputs[i].value.trim();
+        if (nom) {
+            articles.push({
+                quantite: parseInt(qtyInputs[i].value) || 1,
+                nom: nom
+            });
         }
     }
-    switchMode('saisie');
-    document.getElementById('collageResult').innerHTML = '';
-    showToast('✅ Données collées importées !', 'success');
+
+    if (articles.length === 0) {
+        showToast('⚠️ Ajoutez au moins un article.', 'error');
+        return;
+    }
+
+    const prix = parseInt(document.getElementById('collagePrix').value) || 0;
+    if (prix <= 0) {
+        showToast('⚠️ Saisissez un prix valide.', 'error');
+        return;
+    }
+
+    const telephone = document.getElementById('collageTelephone').value.trim();
+    if (!telephone) {
+        showToast('⚠️ Veuillez saisir le téléphone du client.', 'error');
+        return;
+    }
+
+    const quartier = document.getElementById('collageQuartier').value.trim();
+    const ville = document.getElementById('collageVille').value.trim();
+    if (!quartier || !ville) {
+        showToast('⚠️ Renseignez le quartier ET la ville.', 'error');
+        return;
+    }
+
+    const frais = parseInt(document.getElementById('collageFrais').value) || 0;
+    const note = document.getElementById('collageNote').value.trim();
+
+    const data = {
+        articles: articles,
+        prixTotal: prix,
+        fraisLivraison: frais,
+        zone: 'Non spécifiée',
+        quartier: quartier,
+        ville: ville,
+        note: note,
+        telephone: telephone,
+        vendeurId: vendeurId,
+        vendeur: vendeurNom,
+        statut: 'À appeler',
+        dateCreation: new Date(),
+        admin: 'Admin'
+    };
+
+    try {
+        const snapshot = await db.collection('commandes').get();
+        const count = snapshot.size + 1;
+        data.numero = `HDIX-${String(count).padStart(3, '0')}`;
+        await db.collection('commandes').add(data);
+
+        playSound('success');
+        showToast(`✅ Commande ${data.numero} enregistrée !`, 'success');
+        closeCollageConfirmation();
+        closeCommandeModal();
+        loadCommandes();
+        loadAppels();
+        loadKPI();
+    } catch(e) {
+        console.error('Erreur enregistrement:', e);
+        showToast('❌ Erreur lors de l\'enregistrement.', 'error');
+    }
+}
+
+function closeCollageConfirmation() {
+    document.getElementById('collageConfirmationModal').classList.remove('active');
 }
 
 function analyserTexte(text) {
-    const result = { articles: [], vendeur: '', prix: null, lieu: '' };
+    const result = { articles: [], vendeur: '', prix: null, frais: 0, lieu: '', telephone: '', note: '' };
     const lines = text.split('\n').filter(l => l.trim());
+
     lines.forEach(line => {
         const trimmed = line.trim();
+
         const articleMatch = trimmed.match(/^(\d+)\s*[xX]?\s*(.+)$/);
-        if (articleMatch) { result.articles.push({ quantite: parseInt(articleMatch[1]), nom: articleMatch[2].trim() }); return; }
+        if (articleMatch) {
+            result.articles.push({ quantite: parseInt(articleMatch[1]), nom: articleMatch[2].trim() });
+            return;
+        }
+
         const prixMatch = trimmed.match(/(\d+[\s']?\d*)\s*F?CFA?/i);
-        if (prixMatch && !result.prix) { result.prix = parseInt(prixMatch[1].replace(/\s/g,'')); return; }
-        if (trimmed.includes('ville')||trimmed.includes('quartier')||trimmed.includes('Libreville')||trimmed.includes('Akanda')||trimmed.includes('Owendo')) { result.lieu = trimmed; return; }
-        if (trimmed.includes('vendeur')||trimmed.includes('Vendeur')) { result.vendeur = trimmed.replace(/vendeur\s*/i,'').trim(); return; }
+        if (prixMatch && !result.prix) {
+            result.prix = parseInt(prixMatch[1].replace(/\s/g, ''));
+            return;
+        }
+
+        const fraisMatch = trimmed.match(/livraison\s*[:]?\s*(\d+[\s']?\d*)/i);
+        if (fraisMatch) {
+            result.frais = parseInt(fraisMatch[1].replace(/\s/g, ''));
+            return;
+        }
+
+        if (trimmed.includes('ville') || trimmed.includes('quartier') ||
+            trimmed.includes('Libreville') || trimmed.includes('Akanda') ||
+            trimmed.includes('Owendo')) {
+            result.lieu = trimmed;
+            return;
+        }
+
+        if (trimmed.includes('vendeur') || trimmed.includes('Vendeur')) {
+            result.vendeur = trimmed.replace(/vendeur\s*/i, '').trim();
+            return;
+        }
+
+        const phoneMatch = trimmed.match(/[\+]?[0-9]{8,15}/);
+        if (phoneMatch && !result.telephone) {
+            result.telephone = phoneMatch[0];
+            return;
+        }
+
+        if (trimmed.includes('note') || trimmed.includes('Note')) {
+            result.note = trimmed.replace(/note\s*/i, '').trim();
+            return;
+        }
     });
-    if (!result.lieu) { for(const line of lines) { if(line.length > 3 && line.length < 50 && !result.lieu) { result.lieu = line.trim(); } } }
-    if (!result.vendeur) { result.vendeur = prompt('Vendeur pour cette commande :') || ''; }
+
+    if (!result.lieu) {
+        for (const line of lines) {
+            if (line.length > 3 && line.length < 50 && !result.lieu) {
+                result.lieu = line.trim();
+            }
+        }
+    }
+
     return result;
 }
 // ========== APPELS ==========
@@ -386,6 +598,7 @@ function afficherAppel() {
     const modal = document.getElementById('appelModal');
     const content = document.getElementById('appelContent');
     const articles = data.articles ? data.articles.map(a => `${a.quantite} x ${a.nom}`).join(', ') : '';
+    const telephone = data.telephone || '';
     content.innerHTML = `
         <div class="step-title">📞 APPEL CLIENT</div>
         <div class="step-subtitle">Bon ${indexAppel+1} sur ${fileAppel.length}</div>
@@ -394,8 +607,9 @@ function afficherAppel() {
         <div class="recap-item"><span>Articles</span><span>${articles}</span></div>
         <div class="recap-item"><span>Lieu</span><span>${data.quartier}, ${data.ville}</span></div>
         <div class="recap-item"><span>Montant</span><span>${formatNumber(data.prixTotal)} FCFA</span></div>
+        <div class="recap-item"><span>📞 Téléphone</span><span><strong>${telephone || 'Non renseigné'}</strong></span></div>
         <div style="margin:16px 0;display:flex;gap:10px;flex-wrap:wrap;">
-            <button onclick="appelerClient('${item.id}')" class="btn-primary" style="flex:1;">📞 Appeler</button>
+            ${telephone ? `<button onclick="appelerClient('${item.id}')" class="btn-primary" style="flex:1;">📞 Appeler</button>` : ''}
             <button onclick="whatsappClient('${item.id}')" class="btn-primary" style="flex:1;background:#25D366;">💬 WhatsApp</button>
             <button onclick="smsClient('${item.id}')" class="btn-primary" style="flex:1;background:#8e44ad;">🤖 IA</button>
         </div>
@@ -475,10 +689,16 @@ async function afficherCommande(id) {
         const modal = document.getElementById('detailCommandeModal');
         const content = document.getElementById('detailCommandeContent');
 
+        // Construction des articles modifiables
         let articlesHtml = '';
         if (data.articles && data.articles.length > 0) {
-            data.articles.forEach(a => {
-                articlesHtml += `<div class="recap-item"><span>${a.quantite} x ${a.nom}</span></div>`;
+            data.articles.forEach((a, idx) => {
+                articlesHtml += `
+                    <div style="display:flex;gap:8px;margin-bottom:4px;">
+                        <input type="number" value="${a.quantite}" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="edit-qty" />
+                        <input type="text" value="${a.nom}" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="edit-name" />
+                    </div>
+                `;
             });
         } else {
             articlesHtml = '<span style="color:#6b7a8f;">Aucun article</span>';
@@ -487,20 +707,42 @@ async function afficherCommande(id) {
         const prix = formatNumber(data.prixTotal || 0);
         const frais = formatNumber(data.fraisLivraison || 0);
 
+        // Liste des statuts
+        const statuts = ['À appeler', 'Validé', 'En-cours', 'Livrée', 'Indisponible', 'Va rappeler', 'Annulée', 'Refusée', 'Reportée'];
+        let statutOptions = '';
+        statuts.forEach(s => {
+            const selected = data.statut === s ? 'selected' : '';
+            statutOptions += `<option value="${s}" ${selected}>${s}</option>`;
+        });
+
         content.innerHTML = `
             <div class="step-title">📋 ${data.numero || 'N/A'}</div>
             <div style="margin-top:8px;">
-                <div class="recap-item"><span>Vendeur</span><span><strong>${data.vendeur || 'N/A'}</strong></span></div>
-                <div class="recap-item"><span>📞 Téléphone client</span><span><strong>${data.telephone || 'Non renseigné'}</strong></span></div>
+                <div class="recap-item"><span>Vendeur</span>
+                    <span><input type="text" id="editVendeur" value="${data.vendeur || ''}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span>
+                </div>
+                <div class="recap-item"><span>📞 Téléphone</span>
+                    <span><input type="tel" id="editTelephone" value="${data.telephone || ''}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span>
+                </div>
                 <div class="recap-item"><span>Articles</span></div>
-                <div style="padding:4px 0 8px 16px;">${articlesHtml}</div>
-                <div class="recap-item"><span>💰 Montant</span><span><strong>${prix} FCFA</strong></span></div>
-                <div class="recap-item"><span>🚚 Frais livraison</span><span><strong>${frais} FCFA</strong></span></div>
-                <div class="recap-item"><span>📍 Lieu</span><span><strong>${data.quartier || ''}, ${data.ville || ''}</strong></span></div>
-                <div class="recap-item"><span>📌 Statut</span><span><span class="statut ${data.statut === 'Livrée' ? 'statut-livree' : data.statut === 'À appeler' ? 'statut-appel' : 'statut-attente'}">${data.statut || 'N/A'}</span></span></div>
-                ${data.note ? `<div class="recap-item"><span>📝 Note</span><span>${data.note}</span></div>` : ''}
+                <div id="editArticlesContainer" style="padding:4px 0 8px 16px;">${articlesHtml}</div>
+                <button onclick="ajouterLigneArticleEdit()" class="add-article-btn" style="margin-top:4px;padding:6px;">+ Ajouter un article</button>
+                <div class="recap-item"><span>💰 Montant</span>
+                    <span><input type="number" id="editPrix" value="${data.prixTotal || 0}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span>
+                </div>
+                <div class="recap-item"><span>🚚 Frais livraison</span>
+                    <span><input type="number" id="editFrais" value="${data.fraisLivraison || 0}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span>
+                </div>
+                <div class="recap-item"><span>📍 Lieu</span>
+                    <span><input type="text" id="editQuartier" value="${data.quartier || ''}" placeholder="Quartier" style="width:48%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" />
+                    <input type="text" id="editVille" value="${data.ville || ''}" placeholder="Ville" style="width:48%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span>
+                </div>
+                <div class="recap-item"><span>📌 Statut</span>
+                    <span><select id="editStatut" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;">${statutOptions}</select></span>
+                </div>
+                ${data.note ? `<div class="recap-item"><span>📝 Note</span><span><input type="text" id="editNote" value="${data.note}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>` : ''}
                 <div style="margin-top:12px;border-top:1px solid #e2e8f0;padding-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-                    <button onclick="closeDetailCommandeModal(); modifierCommande('${id}')" class="btn-primary" style="flex:1;padding:8px;">✏️ Modifier</button>
+                    <button onclick="enregistrerModificationsCommande('${id}')" class="btn-success" style="flex:1;padding:8px;">💾 Enregistrer</button>
                     ${data.telephone ? `<button onclick="appelerClientDepuisCommande('${data.telephone}')" class="btn-primary" style="flex:1;padding:8px;background:#25D366;">📞 Appeler</button>` : ''}
                     <button onclick="closeDetailCommandeModal()" class="btn-secondary" style="flex:1;padding:8px;">Fermer</button>
                 </div>
@@ -515,8 +757,60 @@ async function afficherCommande(id) {
     }
 }
 
-function closeDetailCommandeModal() {
-    document.getElementById('detailCommandeModal').classList.remove('active');
+function ajouterLigneArticleEdit() {
+    const container = document.getElementById('editArticlesContainer');
+    const idx = container.querySelectorAll('.edit-qty').length;
+    const div = document.createElement('div');
+    div.style.display = 'flex';
+    div.style.gap = '8px';
+    div.style.marginBottom = '4px';
+    div.innerHTML = `
+        <input type="number" value="1" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="edit-qty" />
+        <input type="text" value="" placeholder="Nom de l'article" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="edit-name" />
+    `;
+    container.appendChild(div);
+}
+
+async function enregistrerModificationsCommande(id) {
+    playSound('click');
+    try {
+        const qtyInputs = document.querySelectorAll('.edit-qty');
+        const nameInputs = document.querySelectorAll('.edit-name');
+        const articles = [];
+        for (let i = 0; i < qtyInputs.length; i++) {
+            const nom = nameInputs[i].value.trim();
+            if (nom) {
+                articles.push({
+                    quantite: parseInt(qtyInputs[i].value) || 0,
+                    nom: nom
+                });
+            }
+        }
+
+        const updateData = {
+            vendeur: document.getElementById('editVendeur').value.trim(),
+            telephone: document.getElementById('editTelephone').value.trim(),
+            articles: articles,
+            prixTotal: parseInt(document.getElementById('editPrix').value) || 0,
+            fraisLivraison: parseInt(document.getElementById('editFrais').value) || 0,
+            quartier: document.getElementById('editQuartier').value.trim(),
+            ville: document.getElementById('editVille').value.trim(),
+            statut: document.getElementById('editStatut').value,
+            note: document.getElementById('editNote')?.value.trim() || '',
+            dateModification: new Date()
+        };
+
+        await db.collection('commandes').doc(id).update(updateData);
+        playSound('success');
+        showToast('✅ Commande mise à jour !', 'success');
+        closeDetailCommandeModal();
+        loadCommandes();
+        loadAppels();
+        loadKPI();
+    } catch(e) {
+        console.error('Erreur mise à jour:', e);
+        showToast('❌ Erreur lors de la mise à jour.', 'error');
+    }
 }
 
 function appelerClientDepuisCommande(telephone) {
@@ -527,6 +821,10 @@ function appelerClientDepuisCommande(telephone) {
     } else {
         showToast('⚠️ Numéro invalide.', 'error');
     }
+}
+
+function closeDetailCommandeModal() {
+    document.getElementById('detailCommandeModal').classList.remove('active');
 }
 
 // ========== COMMANDES CRUD ==========
@@ -579,7 +877,8 @@ async function loadVendeurs() {
             if (!userSnap.empty) { code = userSnap.docs[0].data().code_secret || 'N/A'; }
             html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>📞 ${data.telephone} | ${data.abreviation||'N/A'} | 🔑 ${code}</small></div>
                 <div><button onclick="editVendeur('${doc.id}')" class="btn-edit">✏️</button>
-                <button onclick="deleteVendeur('${doc.id}')" class="btn-delete">🗑️</button></div></div>`;
+                <button onclick="deleteVendeur('${doc.id}')" class="btn-delete">🗑️</button>
+                <button onclick="resetVendeurCode('${doc.id}')" class="btn-edit" style="background:#fef9e7;">🔑</button></div></div>`;
         }
         html += '</div>';
         container.innerHTML = html;
@@ -636,6 +935,26 @@ async function editVendeur(id) {
     loadVendeurs();
 }
 
+async function resetVendeurCode(id) {
+    playSound('click');
+    if (!confirm('Réinitialiser le code secret de ce vendeur ?')) return;
+    try {
+        const newCode = await generateUniqueCode();
+        const s = await db.collection('users').where('vendeurId','==',id).get();
+        if (s.empty) { showToast('⚠️ Utilisateur non trouvé.', 'error'); return; }
+        await db.collection('users').doc(s.docs[0].id).update({ code_secret: newCode });
+        const vendeurDoc = await db.collection('vendeurs').doc(id).get();
+        const vendeurData = vendeurDoc.data();
+        playSound('success');
+        showToast(`✅ Nouveau code: ${newCode}`, 'success');
+        if (confirm(`Envoyer le nouveau code (${newCode}) par WhatsApp ?`)) {
+            const phone = vendeurData.telephone.replace('+','');
+            window.open(`https://wa.me/${phone}?text=Bonjour ${vendeurData.nom}, votre nouveau code HDIX est: ${newCode}`, '_blank');
+        }
+        loadVendeurs();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
+}
+
 // ========== LIVREURS ==========
 async function loadLivreurs() {
     try {
@@ -650,7 +969,8 @@ async function loadLivreurs() {
             if (!userSnap.empty) { code = userSnap.docs[0].data().code_secret || 'N/A'; }
             html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>📞 ${data.telephone} | ${data.zone||'N/A'} | 🔑 ${code}</small></div>
                 <div><button onclick="editLivreur('${doc.id}')" class="btn-edit">✏️</button>
-                <button onclick="deleteLivreur('${doc.id}')" class="btn-delete">🗑️</button></div></div>`;
+                <button onclick="deleteLivreur('${doc.id}')" class="btn-delete">🗑️</button>
+                <button onclick="resetLivreurCode('${doc.id}')" class="btn-edit" style="background:#fef9e7;">🔑</button></div></div>`;
         }
         html += '</div>';
         container.innerHTML = html;
@@ -709,6 +1029,26 @@ async function editLivreur(id) {
     playSound('success');
     showToast('✅ Livreur modifié.', 'success');
     loadLivreurs();
+}
+
+async function resetLivreurCode(id) {
+    playSound('click');
+    if (!confirm('Réinitialiser le code secret de ce livreur ?')) return;
+    try {
+        const newCode = await generateUniqueCode();
+        const s = await db.collection('users').where('livreurId','==',id).get();
+        if (s.empty) { showToast('⚠️ Utilisateur non trouvé.', 'error'); return; }
+        await db.collection('users').doc(s.docs[0].id).update({ code_secret: newCode });
+        const livreurDoc = await db.collection('livreurs').doc(id).get();
+        const livreurData = livreurDoc.data();
+        playSound('success');
+        showToast(`✅ Nouveau code: ${newCode}`, 'success');
+        if (confirm(`Envoyer le nouveau code (${newCode}) par WhatsApp ?`)) {
+            const phone = livreurData.telephone.replace('+','');
+            window.open(`https://wa.me/${phone}?text=Bonjour ${livreurData.nom}, votre nouveau code HDIX est: ${newCode}`, '_blank');
+        }
+        loadLivreurs();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
 // ========== STOCKAGE ==========
@@ -1050,7 +1390,7 @@ async function copyBilan() {
         showToast('✅ Bilan copié !', 'success');
     } catch(e) { showToast('❌ Erreur copie.', 'error'); }
 }
-// ========== BILAN (suite) ==========
+
 async function generatePDF() {
     playSound('click');
     showToast('📄 Fonctionnalité PDF bientôt disponible.', 'info');
@@ -1294,5 +1634,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     document.getElementById('detailCommandeModal').addEventListener('click', function(e) {
         if (e.target === this) closeDetailCommandeModal();
+    });
+    document.getElementById('collageConfirmationModal').addEventListener('click', function(e) {
+        if (e.target === this) closeCollageConfirmation();
     });
 });
