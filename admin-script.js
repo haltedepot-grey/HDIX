@@ -1,4 +1,4 @@
-// admin-script.js - Version complète (environ 1000 lignes)
+// admin-script.js - PARTIE 1 (Sons, Toast, Navigation, KPI, Commandes)
 
 // ========== SONS ==========
 let clickSound = null, successSound = null, errorSound = null;
@@ -128,7 +128,7 @@ function filtrerCommandes(statut) {
     filtreActif = statut;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === statut));
     loadCommandes();
-}
+}// admin-script.js - PARTIE 2 (Modale commande, Collage, Confirmation)
 
 // ========== MODALE NOUVELLE COMMANDE ==========
 async function openCommandeModal(commandeId) {
@@ -229,12 +229,12 @@ async function saveCommande() {
     } catch(e) { console.error(e); showToast('❌ Erreur enregistrement.', 'error'); }
 }
 
-// ========== COLLAGE ==========
+// ========== COLLAGE AVEC BOUTON COLLER ==========
 function collerTexte() {
     playSound('click');
     navigator.clipboard.readText().then(text => {
         document.getElementById('collageInput').value = text;
-        showToast('✅ Texte collé ! Analyse automatique...', 'success');
+        showToast('✅ Texte collé ! Analyse automatique en cours...', 'success');
         setTimeout(analyserCollage, 400);
     }).catch(() => {
         showToast('⚠️ Collez manuellement (Ctrl+V).', 'error');
@@ -360,6 +360,8 @@ function analyserTexte(text) {
     if (!result.lieu) { for (const line of lines) { if (line.length > 3 && line.length < 50 && !result.lieu) { result.lieu = line.trim(); } } }
     return result;
 }
+// admin-script.js - PARTIE 3 (Appels, Modale détail, CRUD, Vendeurs, Livreurs, Stockage)
+
 // ========== APPELS ==========
 let fileAppel = [], indexAppel = 0;
 
@@ -403,6 +405,12 @@ function afficherAppel() {
     const content = document.getElementById('appelContent');
     const articles = data.articles ? data.articles.map(a => `${a.quantite} x ${a.nom}`).join(', ') : '';
     const telephone = data.telephone || '';
+    
+    // Liste des statuts
+    const statuts = ['À appeler', 'Validé', 'En-cours', 'Livrée', 'Indisponible', 'Va rappeler', 'Annulée', 'Refusée', 'Reportée'];
+    let statutOptions = '';
+    statuts.forEach(s => { const selected = data.statut === s ? 'selected' : ''; statutOptions += `<option value="${s}" ${selected}>${s}</option>`; });
+    
     content.innerHTML = `
         <div class="step-title">📞 APPEL CLIENT</div>
         <div class="step-subtitle">Bon ${indexAppel+1} sur ${fileAppel.length}</div>
@@ -412,27 +420,31 @@ function afficherAppel() {
         <div class="recap-item"><span>Lieu</span><span>${data.quartier}, ${data.ville}</span></div>
         <div class="recap-item"><span>Montant</span><span>${formatNumber(data.prixTotal)} FCFA</span></div>
         <div class="recap-item"><span>📞 Téléphone</span><span><strong>${telephone || 'Non renseigné'}</strong></span></div>
+        <div class="recap-item"><span>📌 Statut</span>
+            <span><select id="appelStatut" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;">${statutOptions}</select></span>
+        </div>
         <div style="margin:16px 0;display:flex;gap:10px;flex-wrap:wrap;">
             ${telephone ? `<button onclick="appelerClient('${item.id}')" class="btn-primary" style="flex:1;">📞 Appeler</button>` : ''}
             <button onclick="whatsappClient('${item.id}')" class="btn-primary" style="flex:1;background:#25D366;">💬 WhatsApp</button>
             <button onclick="smsClient('${item.id}')" class="btn-primary" style="flex:1;background:#8e44ad;">🤖 IA</button>
         </div>
         <div style="margin:16px 0;display:flex;gap:10px;flex-wrap:wrap;">
-            <button onclick="validerAppel('${item.id}','Validé')" class="btn-success" style="flex:1;padding:12px;">✅ Validé</button>
-            <button onclick="validerAppel('${item.id}','Reporté')" class="btn-secondary" style="flex:1;padding:12px;">📅 Reporté</button>
-            <button onclick="validerAppel('${item.id}','Refusé')" class="btn-danger" style="flex:1;padding:12px;">❌ Refusé</button>
+            <button onclick="validerAppel('${item.id}')" class="btn-success" style="flex:1;padding:12px;">✅ Valider</button>
+            <button onclick="fermerAppelModal()" class="btn-secondary" style="flex:1;padding:12px;">Fermer</button>
         </div>
-        <p class="info-text">Le prochain bon apparaîtra automatiquement.</p>`;
+        <p class="info-text">Le prochain bon apparaîtra automatiquement après validation.</p>`;
     modal.classList.add('active');
 }
 
 function fermerAppelModal() { document.getElementById('appelModal').classList.remove('active'); }
 document.getElementById('appelModal').addEventListener('click', function(e) { if (e.target === this) fermerAppelModal(); });
 
-async function validerAppel(id, statut) {
+async function validerAppel(id) {
+    const statut = document.getElementById('appelStatut').value;
     try {
         await db.collection('commandes').doc(id).update({ statut: statut, dateAppel: new Date() });
         playSound('success');
+        showToast(`✅ Commande ${statut}`, 'success');
         indexAppel++;
         afficherAppel();
         loadCommandes(); loadAppels(); loadKPI();
@@ -446,10 +458,6 @@ function appelerClient(id) {
         const phone = data.telephone || prompt('Numéro du client :');
         if (phone) { window.location.href = `tel:${phone.replace(/[^0-9+]/g, '')}`; }
         showToast('📞 Appel en cours...', 'info');
-        setTimeout(() => {
-            if (confirm('Le client a-t-il répondu ?')) { validerAppel(id, 'Validé'); }
-            else { showToast('📞 Client injoignable.', 'info'); }
-        }, 1500);
     });
 }
 
@@ -885,6 +893,8 @@ async function appliquerPenalites() {
         loadStockage();
     } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
+// admin-script.js - PARTIE 4 (FIN) - Inscriptions, Bilan, Tournées, Stock, Utilitaires, Init
+
 // ========== INSCRIPTIONS ==========
 async function loadInscriptions() {
     try {

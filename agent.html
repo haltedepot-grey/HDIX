@@ -31,7 +31,7 @@
         </div>
         <div class="header-right">
             <span id="agentName">Agent</span>
-            <button onclick="logout()" class="btn-logout">Déconnexion</button>
+            <button onclick="logoutA()" class="btn-logout">Déconnexion</button>
         </div>
     </header>
 
@@ -91,7 +91,7 @@
         <div id="modeSaisieAgent">
             <div class="vendeur-select-row"><label>Vendeur</label><select id="commandeVendeurSelectAgent"><option value="">-- Sélectionnez --</option></select></div>
             <div class="form-group"><label>Téléphone client *</label><input type="tel" id="commandeTelephoneAgent" placeholder="+241 66 12 34 56" /></div>
-            <div id="articlesContainerAgent"><div class="article-row"><input type="number" class="article-qty" placeholder="Qté" min="1" value="1" /><input type="text" class="article-name" placeholder="Nom de l'article" /></div></div>
+            <div id="articlesContainerAgent"><div class="article-row"><input type="number" class="article-qty" placeholder="Qté" min="1" value="1" /><input type="text" class="article-name" placeholder="Nom" /></div></div>
             <button onclick="addArticleRowAgent()" class="add-article-btn">+ Ajouter un autre article</button>
             <div class="form-group"><label>Prix total (FCFA)</label><input type="number" id="commandePrixAgent" placeholder="Ex: 12000" min="0" /></div>
             <div class="form-group"><label><input type="checkbox" id="commandeFraisInclusAgent" checked /> Frais de livraison inclus</label></div>
@@ -102,21 +102,42 @@
             <button onclick="saveCommandeAgent()" class="btn-primary btn-success">✅ Enregistrer</button>
         </div>
         <div id="modeCollageAgent" style="display:none;">
-            <div class="collage-zone"><textarea id="collageInputAgent" rows="6" placeholder="Collez le bon de commande ici..."></textarea></div>
-            <button onclick="analyserCollageAgent()" class="btn-collage">🔍 Analyser</button>
+            <div class="collage-zone">
+                <textarea id="collageInputAgent" rows="6" placeholder="Collez le bon de commande ici..."></textarea>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:8px;">
+                <button onclick="collerTexteAgent()" class="btn-secondary" style="flex:1;">📋 Coller</button>
+                <button onclick="analyserCollageAgent()" class="btn-collage" style="flex:1;">🔍 Analyser</button>
+            </div>
             <div id="collageResultAgent" style="margin-top:16px;"></div>
         </div>
     </div>
 </div>
 
-<!-- MODALE AJOUTER STOCK (Agent) -->
+<!-- MODALE CONFIRMATION COLLAGE (Agent) -->
+<div class="modal" id="collageConfirmationModalAgent">
+    <div class="modal-content" style="max-width:550px;">
+        <button class="modal-close" onclick="closeCollageConfirmationAgent()">✕</button>
+        <div id="collageConfirmationContentAgent"><div class="spinner" style="margin:20px auto;"></div></div>
+    </div>
+</div>
+
+<!-- MODALE DÉTAIL COMMANDE (Agent) -->
+<div class="modal" id="detailCommandeModalAgent">
+    <div class="modal-content" style="max-width:500px;">
+        <button class="modal-close" onclick="closeDetailCommandeModalAgent()">✕</button>
+        <div id="detailCommandeContentAgent"><div class="spinner" style="margin:20px auto;"></div></div>
+    </div>
+</div>
+
+<!-- MODALES STOCK (Agent) -->
 <div class="modal" id="stockModalAgent">
     <div class="modal-content">
         <button class="modal-close" onclick="closeStockModalAgent()">✕</button>
         <div class="step-title">📦 AJOUTER STOCK</div>
         <div class="vendeur-select-row"><label>Vendeur</label><select id="stockVendeurSelectAgent"><option value="">-- Sélectionnez --</option></select></div>
-        <div id="stockArticlesContainerAgent"><div class="article-row"><input type="text" class="stock-article-name" placeholder="Nom de l'article" /><input type="number" class="stock-article-qty" placeholder="Quantité" min="1" value="1" /></div></div>
-        <button onclick="addStockRowAgent()" class="add-article-btn">+ Ajouter un autre article</button>
+        <div id="stockArticlesContainerAgent"><div class="article-row"><input type="text" class="stock-article-name" placeholder="Nom" /><input type="number" class="stock-article-qty" placeholder="Qté" min="1" value="1" /></div></div>
+        <button onclick="addStockRowAgent()" class="add-article-btn">+ Ajouter</button>
         <div style="display:flex;gap:10px;margin-top:16px;">
             <button onclick="consulterStockAgent()" class="btn-secondary" style="flex:1;">📦 Consulter stock</button>
             <button onclick="saveStockAgent()" class="btn-primary btn-success" style="flex:1;">✅ Valider</button>
@@ -124,7 +145,6 @@
     </div>
 </div>
 
-<!-- MODALE CONSULTER STOCK (Agent) -->
 <div class="modal" id="consulterStockModalAgent">
     <div class="modal-content">
         <button class="modal-close" onclick="closeConsulterStockModalAgent()">✕</button>
@@ -133,7 +153,7 @@
             <select id="stockFiltreVendeurAgent" style="flex:2;"><option value="all">Tous les vendeurs</option></select>
             <button onclick="rafraichirStockAgent()" class="btn-secondary" style="flex:1;">🔄 Rafraîchir</button>
         </div>
-        <div id="stockListContainerAgent"><p class="empty-message">Chargement du stock...</p></div>
+        <div id="stockListContainerAgent"><p class="empty-message">Chargement...</p></div>
         <button onclick="closeConsulterStockModalAgent()" class="btn-primary" style="margin-top:12px;">⬅️ Retour</button>
     </div>
 </div>

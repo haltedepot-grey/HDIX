@@ -20,7 +20,6 @@
 <body>
 <div class="app-container">
 
-    <!-- ========== EN-TÊTE ========== -->
     <header class="admin-header">
         <div class="header-left">
             <div class="header-logo">
@@ -35,7 +34,6 @@
         </div>
     </header>
 
-    <!-- ========== NAVIGATION ========== -->
     <div class="admin-nav">
         <div class="nav-group">
             <button class="nav-btn active" onclick="showSection('commandes')">📦 Commandes</button>
@@ -61,7 +59,6 @@
         <button class="nav-btn" onclick="window.location.href='tresorerie.html'">💰 Trésorerie</button>
     </div>
 
-    <!-- ========== SECTIONS ========== -->
     <div id="section-kpi" class="section" style="display:none;">
         <h3>📊 KPI <button onclick="loadKPI()" class="refresh-btn">🔄</button></h3>
         <div class="kpi-grid">
@@ -78,7 +75,6 @@
         </div>
     </div>
 
-    <!-- SECTION COMMANDES -->
     <div id="section-commandes" class="section active">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
             <h3>📋 Commandes</h3>
@@ -101,7 +97,6 @@
         <div class="commandes-list"><div id="commandesContainer"><div class="spinner" style="margin:30px auto;"></div></div></div>
     </div>
 
-    <!-- SECTION APPELS -->
     <div id="section-appels" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📞 Appels</h3><button onclick="loadAppels()" class="refresh-btn">🔄</button></div>
         <div id="appelsContainer"><div class="spinner" style="margin:30px auto;"></div></div>
@@ -111,21 +106,18 @@
         <div id="appelModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="fermerAppelModal()">✕</button><div id="appelContent"><p class="empty-message">Aucun appel en cours.</p></div></div></div>
     </div>
 
-    <!-- SECTION VENDEURS -->
     <div id="section-vendeurs" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>👤 Vendeurs</h3><button onclick="loadVendeurs()" class="refresh-btn">🔄</button></div>
         <button onclick="openVendeurForm()" class="btn-primary" style="margin:12px 0;">➕ Ajouter un vendeur</button>
         <div id="vendeursList"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
 
-    <!-- SECTION LIVREURS -->
     <div id="section-livreurs" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>🚚 Livreurs</h3><button onclick="loadLivreurs()" class="refresh-btn">🔄</button></div>
         <button onclick="openLivreurForm()" class="btn-primary" style="margin:12px 0;">➕ Ajouter un livreur</button>
         <div id="livreursList"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
 
-    <!-- SECTION STOCKAGE -->
     <div id="section-stockage" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📦 Stockage</h3><button onclick="loadStockage()" class="refresh-btn">🔄</button></div>
         <div class="stockage-grid">
@@ -137,7 +129,6 @@
         <div id="stockageList"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
 
-    <!-- SECTION BILAN -->
     <div id="section-bilan" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📊 Bilan</h3><button onclick="loadVendeursForBilan()" class="refresh-btn">🔄</button></div>
         <div class="bilan-section">
@@ -153,13 +144,11 @@
         <div class="bilan-section"><h3>📈 Rapport mensuel</h3><button onclick="generateMonthlyReport()" class="btn-primary">📊 Générer rapport</button><div id="monthlyReportContainer"><p class="empty-message">Cliquez sur "Générer".</p></div></div>
     </div>
 
-    <!-- SECTION INSCRIPTIONS -->
     <div id="section-inscriptions" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>📝 Inscriptions</h3><button onclick="loadInscriptions()" class="refresh-btn">🔄</button></div>
         <div id="inscriptionsList"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
 
-    <!-- SECTION TOURNÉES -->
     <div id="section-tournees" class="section" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3>🗺️ Tournées</h3><button onclick="optimiserTournees()" class="refresh-btn">🔄</button></div>
         <div style="margin:16px 0;">
@@ -185,7 +174,7 @@
         <div id="modeSaisie">
             <div class="vendeur-select-row"><label>Vendeur</label><select id="commandeVendeurSelect"><option value="">-- Sélectionnez --</option></select></div>
             <div class="form-group"><label>Téléphone client *</label><input type="tel" id="commandeTelephone" placeholder="+241 66 12 34 56" /></div>
-            <div id="articlesContainer"><div class="article-row"><input type="number" class="article-qty" placeholder="Qté" min="1" value="1" /><input type="text" class="article-name" placeholder="Nom de l'article" /></div></div>
+            <div id="articlesContainer"><div class="article-row"><input type="number" class="article-qty" placeholder="Qté" min="1" value="1" /><input type="text" class="article-name" placeholder="Nom" /></div></div>
             <button onclick="addArticleRow()" class="add-article-btn">+ Ajouter un autre article</button>
             <div class="form-group"><label>Prix total (FCFA)</label><input type="number" id="commandePrix" placeholder="Ex: 12000" min="0" /></div>
             <div class="form-group"><label><input type="checkbox" id="commandeFraisInclus" checked /> Frais de livraison inclus</label></div>
@@ -196,7 +185,7 @@
             <button onclick="saveCommande()" class="btn-primary btn-success" style="width:100%;padding:12px;">✅ Enregistrer</button>
         </div>
 
-        <!-- MODE COLLAGE -->
+        <!-- MODE COLLAGE AVEC BOUTON COLLER -->
         <div id="modeCollage" style="display:none;">
             <div class="collage-zone">
                 <textarea id="collageInput" rows="6" placeholder="Collez le bon de commande ici..."></textarea>
