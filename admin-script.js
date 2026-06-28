@@ -1,44 +1,25 @@
-// admin-script.js - Version complète avec mode Collage corrigé
+// admin-script.js - Version complète (environ 1000 lignes)
 
-// ========== SONS PERSONNALISÉS ==========
-let clickSound = null;
-let successSound = null;
-let errorSound = null;
-
+// ========== SONS ==========
+let clickSound = null, successSound = null, errorSound = null;
 function loadSounds() {
     try {
         clickSound = new Audio('assets/sounds/click.mp3');
         successSound = new Audio('assets/sounds/success.mp3');
         errorSound = new Audio('assets/sounds/error.mp3');
-        clickSound.load();
-        successSound.load();
-        errorSound.load();
-        clickSound.volume = 0.6;
-        successSound.volume = 0.5;
-        errorSound.volume = 0.5;
-    } catch(e) {
-        console.log('Sons non disponibles');
-    }
+        clickSound.load(); successSound.load(); errorSound.load();
+        clickSound.volume = 0.6; successSound.volume = 0.5; errorSound.volume = 0.5;
+    } catch(e) { console.log('Sons non disponibles'); }
 }
-
 function playSound(type) {
     try {
-        if (type === 'click' && clickSound) {
-            clickSound.currentTime = 0;
-            clickSound.play().catch(e => {});
-        } else if (type === 'success' && successSound) {
-            successSound.currentTime = 0;
-            successSound.play().catch(e => {});
-        } else if (type === 'error' && errorSound) {
-            errorSound.currentTime = 0;
-            errorSound.play().catch(e => {});
-        }
+        if (type === 'click' && clickSound) { clickSound.currentTime = 0; clickSound.play().catch(e=>{}); }
+        else if (type === 'success' && successSound) { successSound.currentTime = 0; successSound.play().catch(e=>{}); }
+        else if (type === 'error' && errorSound) { errorSound.currentTime = 0; errorSound.play().catch(e=>{}); }
     } catch(e) {}
 }
-
 loadSounds();
 
-// ========== TOAST ==========
 function showToast(message, type = 'info') {
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
@@ -46,18 +27,10 @@ function showToast(message, type = 'info') {
     toast.className = `toast toast-${type}`;
     toast.textContent = message;
     document.body.appendChild(toast);
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transition = 'opacity 0.3s';
-        setTimeout(() => toast.remove(), 400);
-    }, 3000);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 400); }, 3000);
 }
 
-// ========== FORMATAGE ==========
-function formatNumber(num) {
-    if (num === undefined || num === null) return '0';
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-}
+function formatNumber(num) { if (num === undefined || num === null) return '0'; return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 
 // ========== NAVIGATION ==========
 function showSection(section) {
@@ -76,38 +49,27 @@ function showSection(section) {
     if (section === 'tournees') optimiserTournees();
 }
 
-function logout() {
-    playSound('click');
-    sessionStorage.removeItem('user');
-    window.location.href = 'index.html';
-}
+function logout() { playSound('click'); sessionStorage.removeItem('user'); window.location.href = 'index.html'; }
 
 // ========== KPI ==========
 async function loadKPI() {
     showSpinner();
     try {
-        const today = new Date();
-        today.setHours(0,0,0,0);
+        const today = new Date(); today.setHours(0,0,0,0);
         const snapshot = await db.collection('commandes').where('dateCreation', '>=', today).get();
         const vendeurs = await db.collection('vendeurs').get();
         const livreurs = await db.collection('livreurs').get();
         let total = 0, appeler = 0, livree = 0, ca = 0;
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            total++;
-            if (data.statut === 'À appeler') appeler++;
-            if (data.statut === 'Livrée') livree++;
-            ca += data.prixTotal || 0;
-        });
+        snapshot.forEach(doc => { const data = doc.data(); total++; if (data.statut === 'À appeler') appeler++; if (data.statut === 'Livrée') livree++; ca += data.prixTotal || 0; });
         document.getElementById('kpiTotal').textContent = total;
         document.getElementById('kpiAppeler').textContent = appeler;
         document.getElementById('kpiLivree').textContent = livree;
         document.getElementById('kpiCA').textContent = formatNumber(ca);
         document.getElementById('kpiVendeurs').textContent = vendeurs.size;
         document.getElementById('kpiLivreurs').textContent = livreurs.size;
-        const tx = total > 0 ? Math.round((livree / total) * 100) : 0;
+        const tx = total > 0 ? Math.round((livree/total)*100) : 0;
         document.getElementById('kpiTauxLivraison').textContent = tx + '%';
-        const moy = livree > 0 ? Math.round(ca / livree) : 0;
+        const moy = livree > 0 ? Math.round(ca/livree) : 0;
         document.getElementById('kpiMoyenne').textContent = formatNumber(moy);
         document.getElementById('kpiTotalTrend').textContent = '▲ ' + (total > 0 ? Math.round(Math.random()*20) : 0) + '%';
         document.getElementById('kpiAppelerTrend').textContent = '▲ ' + (appeler > 0 ? Math.round(Math.random()*15) : 0) + '%';
@@ -122,18 +84,15 @@ function hideSpinner() { document.getElementById('globalSpinner').classList.remo
 
 // ========== COMMANDES ==========
 let filtreActif = 'all';
-
 async function loadCommandes() {
     try {
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        let query = db.collection('commandes').where('dateCreation', '>=', today).where('dateCreation', '<', tomorrow).orderBy('dateCreation', 'desc');
-        if (filtreActif && filtreActif !== 'all') query = query.where('statut', '==', filtreActif);
+        const today = new Date(); today.setHours(0,0,0,0);
+        const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+        let query = db.collection('commandes').where('dateCreation','>=',today).where('dateCreation','<',tomorrow).orderBy('dateCreation','desc');
+        if (filtreActif && filtreActif !== 'all') query = query.where('statut','==',filtreActif);
         const snapshot = await query.get();
         const container = document.getElementById('commandesContainer');
-        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune commande aujourd\'hui.</p>'; updateStats(0,0,0); return; }
+        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune commande.</p>'; updateStats(0,0,0); return; }
         let html = '', appeler = 0, livree = 0, total = 0;
         snapshot.forEach(doc => {
             const data = doc.data();
@@ -149,7 +108,7 @@ async function loadCommandes() {
                     <button onclick="event.stopPropagation(); modifierCommande('${doc.id}')" title="Modifier">✏️</button>
                     <button onclick="event.stopPropagation(); supprimerCommande('${doc.id}')" title="Supprimer">🗑️</button>
                     <button onclick="event.stopPropagation(); afficherCommande('${doc.id}')" title="Voir">👁️</button>
-                    ${data.statut!=='Livrée'?`<button onclick="event.stopPropagation(); assignerCommande('${doc.id}')">🚚</button>`:''}
+                    ${data.statut !== 'Livrée' ? `<button onclick="event.stopPropagation(); assignerCommande('${doc.id}')">🚚</button>` : ''}
                 </span>
             </div>`;
         });
@@ -177,9 +136,7 @@ async function openCommandeModal(commandeId) {
     resetCommandeForm();
     await loadVendeursForSelect('commandeVendeurSelect');
     document.getElementById('commandeModal').classList.add('active');
-    if (commandeId) {
-        await loadCommandeForEdit(commandeId);
-    }
+    if (commandeId) await loadCommandeForEdit(commandeId);
 }
 
 function closeCommandeModal() {
@@ -214,7 +171,7 @@ async function loadVendeursForSelect(selectId) {
     try {
         const snapshot = await db.collection('vendeurs').orderBy('nom').get();
         const select = document.getElementById(selectId);
-        select.innerHTML = '<option value="">-- Sélectionnez un vendeur --</option>';
+        select.innerHTML = '<option value="">-- Sélectionnez --</option>';
         snapshot.forEach(doc => {
             const data = doc.data();
             const opt = document.createElement('option');
@@ -230,7 +187,7 @@ function addArticleRow() {
     const container = document.getElementById('articlesContainer');
     const row = document.createElement('div');
     row.className = 'article-row';
-    row.innerHTML = `<input type="number" class="article-qty" placeholder="Qté" min="1" value="1" /><input type="text" class="article-name" placeholder="Nom de l'article" />`;
+    row.innerHTML = `<input type="number" class="article-qty" placeholder="Qté" min="1" value="1" /><input type="text" class="article-name" placeholder="Nom" />`;
     container.appendChild(row);
 }
 
@@ -240,7 +197,7 @@ async function saveCommande() {
     if (!vendeurId) { showToast('⚠️ Sélectionnez un vendeur.', 'error'); return; }
     const vendeurNom = select.options[select.selectedIndex].textContent;
     const telephone = document.getElementById('commandeTelephone').value.trim();
-    if (!telephone) { showToast('⚠️ Veuillez saisir le téléphone du client.', 'error'); return; }
+    if (!telephone) { showToast('⚠️ Téléphone client requis.', 'error'); return; }
     const rows = document.querySelectorAll('#articlesContainer .article-row');
     const articles = [];
     rows.forEach(row => {
@@ -248,23 +205,18 @@ async function saveCommande() {
         const name = row.querySelector('.article-name').value.trim();
         if (name) articles.push({ quantite: parseInt(qty)||1, nom: name });
     });
-    if (articles.length === 0) { showToast('⚠️ Ajoutez au moins un article.', 'error'); return; }
+    if (articles.length === 0) { showToast('⚠️ Ajoutez un article.', 'error'); return; }
     const prix = parseInt(document.getElementById('commandePrix').value);
-    if (isNaN(prix) || prix <= 0) { showToast('⚠️ Saisissez un prix valide.', 'error'); return; }
+    if (isNaN(prix) || prix <= 0) { showToast('⚠️ Prix valide requis.', 'error'); return; }
     const quartier = document.getElementById('commandeQuartier').value.trim();
     const ville = document.getElementById('commandeVille').value.trim();
-    if (!quartier || !ville) { showToast('⚠️ Renseignez quartier ET ville.', 'error'); return; }
+    if (!quartier || !ville) { showToast('⚠️ Quartier et ville requis.', 'error'); return; }
     const zone = document.getElementById('commandeZone').value;
     const fraisInclus = document.getElementById('commandeFraisInclus').checked;
     const note = document.getElementById('commandeNote').value.trim();
     const zones = { 'Libreville':2000, 'Akanda':3000, 'Owendo':3000, 'Bikélé':3000, 'Autres':4000 };
     const fraisLivraison = fraisInclus ? 0 : (zones[zone] || 0);
-
-    const data = {
-        articles, prixTotal: prix, fraisInclus, fraisLivraison, zone, quartier, ville, note, telephone,
-        vendeurId, vendeur: vendeurNom, statut: 'À appeler', dateCreation: new Date(), admin: 'Admin'
-    };
-
+    const data = { articles, prixTotal: prix, fraisInclus, fraisLivraison, zone, quartier, ville, note, telephone, vendeurId, vendeur: vendeurNom, statut: 'À appeler', dateCreation: new Date(), admin: 'Admin' };
     try {
         const snapshot = await db.collection('commandes').get();
         const count = snapshot.size + 1;
@@ -273,9 +225,7 @@ async function saveCommande() {
         playSound('success');
         showToast(`✅ Commande ${data.numero} enregistrée !`, 'success');
         closeCommandeModal();
-        loadCommandes();
-        loadAppels();
-        loadKPI();
+        loadCommandes(); loadAppels(); loadKPI();
     } catch(e) { console.error(e); showToast('❌ Erreur enregistrement.', 'error'); }
 }
 
@@ -284,110 +234,60 @@ function collerTexte() {
     playSound('click');
     navigator.clipboard.readText().then(text => {
         document.getElementById('collageInput').value = text;
-        showToast('✅ Texte collé ! Analyse automatique en cours...', 'success');
-        setTimeout(() => {
-            analyserCollage();
-        }, 300);
-    }).catch(err => {
-        showToast('⚠️ Impossible d\'accéder au presse-papiers. Collez manuellement (Ctrl+V).', 'error');
+        showToast('✅ Texte collé ! Analyse automatique...', 'success');
+        setTimeout(analyserCollage, 400);
+    }).catch(() => {
+        showToast('⚠️ Collez manuellement (Ctrl+V).', 'error');
         document.getElementById('collageInput').focus();
     });
 }
 
 function analyserCollage() {
     const text = document.getElementById('collageInput').value.trim();
-    if (!text) {
-        showToast('⚠️ Collez un texte.', 'error');
-        return;
-    }
-
+    if (!text) { showToast('⚠️ Collez un texte.', 'error'); return; }
     const result = analyserTexte(text);
-    if (result.articles.length === 0) {
-        showToast('⚠️ Aucun article détecté. Vérifiez le format.', 'error');
-        return;
-    }
-
+    if (result.articles.length === 0) { showToast('⚠️ Aucun article détecté.', 'error'); return; }
     afficherConfirmationCollage(result);
 }
 
 function afficherConfirmationCollage(result) {
     const modal = document.getElementById('collageConfirmationModal');
     const content = document.getElementById('collageConfirmationContent');
-
     let articlesHtml = result.articles.map((a, idx) => `
         <div style="display:flex;gap:8px;margin-bottom:4px;">
             <input type="number" value="${a.quantite}" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-qty" />
             <input type="text" value="${a.nom}" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-name" />
         </div>
     `).join('');
-
     loadVendeursForSelect('collageVendeurSelect').then(() => {
         if (result.vendeur) {
             const select = document.getElementById('collageVendeurSelect');
             for (let i = 0; i < select.options.length; i++) {
-                if (select.options[i].textContent === result.vendeur) {
-                    select.value = select.options[i].value;
-                    break;
-                }
+                if (select.options[i].textContent === result.vendeur) { select.value = select.options[i].value; break; }
             }
         }
     });
-
     content.innerHTML = `
         <div class="step-title">📋 CONFIRMER LA COMMANDE</div>
         <div class="step-subtitle">Vérifiez les informations détectées</div>
-
-        <div class="vendeur-select-row">
-            <label>Vendeur *</label>
-            <select id="collageVendeurSelect">
-                <option value="">-- Sélectionnez un vendeur --</option>
-            </select>
-        </div>
-
-        <div style="margin:12px 0;">
-            <label style="font-weight:500;">Articles</label>
-            <div id="collageArticlesContainer">${articlesHtml}</div>
-            <button onclick="ajouterLigneArticleCollage()" class="add-article-btn" style="margin-top:6px;">+ Ajouter un article</button>
-        </div>
-
+        <div class="vendeur-select-row"><label>Vendeur *</label><select id="collageVendeurSelect"><option value="">-- Sélectionnez --</option></select></div>
+        <div style="margin:12px 0;"><label>Articles</label><div id="collageArticlesContainer">${articlesHtml}</div>
+        <button onclick="ajouterLigneArticleCollage()" class="add-article-btn" style="margin-top:6px;">+ Ajouter un article</button></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <div style="flex:1;">
-                <label style="font-weight:500;">💰 Prix total (FCFA)</label>
-                <input type="number" id="collagePrix" value="${result.prix || ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" />
-            </div>
-            <div style="flex:1;">
-                <label style="font-weight:500;">🚚 Frais livraison</label>
-                <input type="number" id="collageFrais" value="${result.frais || 0}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" />
-            </div>
+            <div style="flex:1;"><label>💰 Prix total</label><input type="number" id="collagePrix" value="${result.prix||''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
+            <div style="flex:1;"><label>🚚 Frais livraison</label><input type="number" id="collageFrais" value="${result.frais||0}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
         </div>
-
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
-            <div style="flex:1;">
-                <label style="font-weight:500;">📍 Quartier</label>
-                <input type="text" id="collageQuartier" value="${result.lieu ? result.lieu.split(',')[0].trim() : ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" />
-            </div>
-            <div style="flex:1;">
-                <label style="font-weight:500;">Ville</label>
-                <input type="text" id="collageVille" value="${result.lieu && result.lieu.includes(',') ? result.lieu.split(',')[1].trim() : ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" />
-            </div>
+            <div style="flex:1;"><label>📍 Quartier</label><input type="text" id="collageQuartier" value="${result.lieu ? result.lieu.split(',')[0].trim() : ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
+            <div style="flex:1;"><label>Ville</label><input type="text" id="collageVille" value="${result.lieu && result.lieu.includes(',') ? result.lieu.split(',')[1].trim() : ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
         </div>
-
-        <div style="margin-top:8px;">
-            <label style="font-weight:500;">📞 Téléphone client</label>
-            <input type="tel" id="collageTelephone" value="${result.telephone || ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" />
-        </div>
-
-        <div style="margin-top:8px;">
-            <label style="font-weight:500;">📝 Note (optionnel)</label>
-            <input type="text" id="collageNote" value="${result.note || ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" />
-        </div>
-
+        <div style="margin-top:8px;"><label>📞 Téléphone client</label><input type="tel" id="collageTelephone" value="${result.telephone||''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
+        <div style="margin-top:8px;"><label>📝 Note</label><input type="text" id="collageNote" value="${result.note||''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
         <div style="margin-top:12px;display:flex;gap:10px;">
             <button onclick="enregistrerCollage()" class="btn-success" style="flex:1;padding:12px;">✅ Enregistrer</button>
             <button onclick="closeCollageConfirmation()" class="btn-secondary" style="flex:1;padding:12px;">Annuler</button>
         </div>
     `;
-
     window._collageResult = result;
     modal.classList.add('active');
 }
@@ -396,172 +296,76 @@ function ajouterLigneArticleCollage() {
     const container = document.getElementById('collageArticlesContainer');
     const idx = container.querySelectorAll('.conf-qty').length;
     const div = document.createElement('div');
-    div.style.display = 'flex';
-    div.style.gap = '8px';
-    div.style.marginBottom = '4px';
-    div.innerHTML = `
-        <input type="number" value="1" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-qty" />
-        <input type="text" value="" placeholder="Nom de l'article" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-name" />
-    `;
+    div.style.display = 'flex'; div.style.gap = '8px'; div.style.marginBottom = '4px';
+    div.innerHTML = `<input type="number" value="1" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-qty" />
+        <input type="text" value="" placeholder="Nom" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-name" />`;
     container.appendChild(div);
 }
 
 async function enregistrerCollage() {
     playSound('click');
-
     const vendeurSelect = document.getElementById('collageVendeurSelect');
     const vendeurId = vendeurSelect.value;
-    if (!vendeurId) {
-        showToast('⚠️ Veuillez sélectionner un vendeur.', 'error');
-        return;
-    }
+    if (!vendeurId) { showToast('⚠️ Sélectionnez un vendeur.', 'error'); return; }
     const vendeurNom = vendeurSelect.options[vendeurSelect.selectedIndex].textContent;
-
     const qtyInputs = document.querySelectorAll('.conf-qty');
     const nameInputs = document.querySelectorAll('.conf-name');
     const articles = [];
-    for (let i = 0; i < qtyInputs.length; i++) {
+    for (let i=0; i<qtyInputs.length; i++) {
         const nom = nameInputs[i].value.trim();
-        if (nom) {
-            articles.push({
-                quantite: parseInt(qtyInputs[i].value) || 1,
-                nom: nom
-            });
-        }
+        if (nom) articles.push({ quantite: parseInt(qtyInputs[i].value)||1, nom: nom });
     }
-
-    if (articles.length === 0) {
-        showToast('⚠️ Ajoutez au moins un article.', 'error');
-        return;
-    }
-
+    if (articles.length === 0) { showToast('⚠️ Ajoutez un article.', 'error'); return; }
     const prix = parseInt(document.getElementById('collagePrix').value) || 0;
-    if (prix <= 0) {
-        showToast('⚠️ Saisissez un prix valide.', 'error');
-        return;
-    }
-
+    if (prix <= 0) { showToast('⚠️ Prix valide requis.', 'error'); return; }
     const telephone = document.getElementById('collageTelephone').value.trim();
-    if (!telephone) {
-        showToast('⚠️ Veuillez saisir le téléphone du client.', 'error');
-        return;
-    }
-
+    if (!telephone) { showToast('⚠️ Téléphone client requis.', 'error'); return; }
     const quartier = document.getElementById('collageQuartier').value.trim();
     const ville = document.getElementById('collageVille').value.trim();
-    if (!quartier || !ville) {
-        showToast('⚠️ Renseignez le quartier ET la ville.', 'error');
-        return;
-    }
-
+    if (!quartier || !ville) { showToast('⚠️ Quartier et ville requis.', 'error'); return; }
     const frais = parseInt(document.getElementById('collageFrais').value) || 0;
     const note = document.getElementById('collageNote').value.trim();
-
-    const data = {
-        articles: articles,
-        prixTotal: prix,
-        fraisLivraison: frais,
-        zone: 'Non spécifiée',
-        quartier: quartier,
-        ville: ville,
-        note: note,
-        telephone: telephone,
-        vendeurId: vendeurId,
-        vendeur: vendeurNom,
-        statut: 'À appeler',
-        dateCreation: new Date(),
-        admin: 'Admin'
-    };
-
+    const data = { articles, prixTotal: prix, fraisLivraison: frais, zone: 'Non spécifiée', quartier, ville, note, telephone, vendeurId, vendeur: vendeurNom, statut: 'À appeler', dateCreation: new Date(), admin: 'Admin' };
     try {
         const snapshot = await db.collection('commandes').get();
         const count = snapshot.size + 1;
         data.numero = `HDIX-${String(count).padStart(3, '0')}`;
         await db.collection('commandes').add(data);
-
         playSound('success');
         showToast(`✅ Commande ${data.numero} enregistrée !`, 'success');
-        closeCollageConfirmation();
-        closeCommandeModal();
-        loadCommandes();
-        loadAppels();
-        loadKPI();
-    } catch(e) {
-        console.error('Erreur enregistrement:', e);
-        showToast('❌ Erreur lors de l\'enregistrement.', 'error');
-    }
+        closeCollageConfirmation(); closeCommandeModal();
+        loadCommandes(); loadAppels(); loadKPI();
+    } catch(e) { console.error(e); showToast('❌ Erreur enregistrement.', 'error'); }
 }
 
-function closeCollageConfirmation() {
-    document.getElementById('collageConfirmationModal').classList.remove('active');
-}
+function closeCollageConfirmation() { document.getElementById('collageConfirmationModal').classList.remove('active'); }
 
 function analyserTexte(text) {
     const result = { articles: [], vendeur: '', prix: null, frais: 0, lieu: '', telephone: '', note: '' };
     const lines = text.split('\n').filter(l => l.trim());
-
     lines.forEach(line => {
         const trimmed = line.trim();
-
         const articleMatch = trimmed.match(/^(\d+)\s*[xX]?\s*(.+)$/);
-        if (articleMatch) {
-            result.articles.push({ quantite: parseInt(articleMatch[1]), nom: articleMatch[2].trim() });
-            return;
-        }
-
+        if (articleMatch) { result.articles.push({ quantite: parseInt(articleMatch[1]), nom: articleMatch[2].trim() }); return; }
         const prixMatch = trimmed.match(/(\d+[\s']?\d*)\s*F?CFA?/i);
-        if (prixMatch && !result.prix) {
-            result.prix = parseInt(prixMatch[1].replace(/\s/g, ''));
-            return;
-        }
-
+        if (prixMatch && !result.prix) { result.prix = parseInt(prixMatch[1].replace(/\s/g, '')); return; }
         const fraisMatch = trimmed.match(/livraison\s*[:]?\s*(\d+[\s']?\d*)/i);
-        if (fraisMatch) {
-            result.frais = parseInt(fraisMatch[1].replace(/\s/g, ''));
-            return;
-        }
-
-        if (trimmed.includes('ville') || trimmed.includes('quartier') ||
-            trimmed.includes('Libreville') || trimmed.includes('Akanda') ||
-            trimmed.includes('Owendo')) {
-            result.lieu = trimmed;
-            return;
-        }
-
-        if (trimmed.includes('vendeur') || trimmed.includes('Vendeur')) {
-            result.vendeur = trimmed.replace(/vendeur\s*/i, '').trim();
-            return;
-        }
-
+        if (fraisMatch) { result.frais = parseInt(fraisMatch[1].replace(/\s/g, '')); return; }
+        if (trimmed.includes('ville')||trimmed.includes('quartier')||trimmed.includes('Libreville')||trimmed.includes('Akanda')||trimmed.includes('Owendo')) { result.lieu = trimmed; return; }
+        if (trimmed.includes('vendeur')||trimmed.includes('Vendeur')) { result.vendeur = trimmed.replace(/vendeur\s*/i,'').trim(); return; }
         const phoneMatch = trimmed.match(/[\+]?[0-9]{8,15}/);
-        if (phoneMatch && !result.telephone) {
-            result.telephone = phoneMatch[0];
-            return;
-        }
-
-        if (trimmed.includes('note') || trimmed.includes('Note')) {
-            result.note = trimmed.replace(/note\s*/i, '').trim();
-            return;
-        }
+        if (phoneMatch && !result.telephone) { result.telephone = phoneMatch[0]; return; }
+        if (trimmed.includes('note')||trimmed.includes('Note')) { result.note = trimmed.replace(/note\s*/i,'').trim(); return; }
     });
-
-    if (!result.lieu) {
-        for (const line of lines) {
-            if (line.length > 3 && line.length < 50 && !result.lieu) {
-                result.lieu = line.trim();
-            }
-        }
-    }
-
+    if (!result.lieu) { for (const line of lines) { if (line.length > 3 && line.length < 50 && !result.lieu) { result.lieu = line.trim(); } } }
     return result;
 }
 // ========== APPELS ==========
-let fileAppel = [];
-let indexAppel = 0;
+let fileAppel = [], indexAppel = 0;
 
 async function loadAppels() {
     try {
-        const snapshot = await db.collection('commandes').where('statut', '==', 'À appeler').orderBy('dateCreation', 'asc').get();
+        const snapshot = await db.collection('commandes').where('statut','==','À appeler').orderBy('dateCreation','asc').get();
         const container = document.getElementById('appelsContainer');
         if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune commande en attente.</p>'; return; }
         let html = '';
@@ -640,9 +444,7 @@ function appelerClient(id) {
     db.collection('commandes').doc(id).get().then(doc => {
         const data = doc.data();
         const phone = data.telephone || prompt('Numéro du client :');
-        if (phone) {
-            window.location.href = `tel:${phone.replace(/[^0-9+]/g, '')}`;
-        }
+        if (phone) { window.location.href = `tel:${phone.replace(/[^0-9+]/g, '')}`; }
         showToast('📞 Appel en cours...', 'info');
         setTimeout(() => {
             if (confirm('Le client a-t-il répondu ?')) { validerAppel(id, 'Validé'); }
@@ -655,10 +457,8 @@ function whatsappClient(id) {
     playSound('click');
     db.collection('commandes').doc(id).get().then(doc => {
         const data = doc.data();
-        const phone = data.telephone || prompt('Numéro WhatsApp du client :');
-        if (phone) {
-            window.open(`https://wa.me/${phone.replace(/[^0-9+]/g, '').replace('+', '')}?text=Bonjour, nous vous confirmons votre livraison (${data.numero}).`, '_blank');
-        }
+        const phone = data.telephone || prompt('Numéro WhatsApp :');
+        if (phone) { window.open(`https://wa.me/${phone.replace(/[^0-9+]/g,'').replace('+','')}?text=Bonjour, nous vous confirmons votre livraison (${data.numero}).`, '_blank'); }
     });
 }
 
@@ -666,11 +466,11 @@ function smsClient(id) {
     playSound('click');
     db.collection('commandes').doc(id).get().then(doc => {
         const data = doc.data();
-        const phone = data.telephone || prompt('Numéro du client :');
+        const phone = data.telephone || prompt('Numéro :');
         if (phone) {
             const lien = `https://hdix.netlify.app/confirmation/${id}`;
             const msg = `📦 Commande ${data.numero}\nConfirmez : OK -> ${lien}/ok | Appelez-moi -> ${lien}/appel | Indisponible -> ${lien}/non`;
-            window.open(`https://wa.me/${phone.replace(/[^0-9+]/g, '').replace('+', '')}?text=${encodeURIComponent(msg)}`, '_blank');
+            window.open(`https://wa.me/${phone.replace(/[^0-9+]/g,'').replace('+','')}?text=${encodeURIComponent(msg)}`, '_blank');
         }
     });
 }
@@ -681,15 +481,9 @@ async function afficherCommande(id) {
     try {
         const doc = await db.collection('commandes').doc(id).get();
         const data = doc.data();
-        if (!data) {
-            showToast('⚠️ Commande non trouvée.', 'error');
-            return;
-        }
-
+        if (!data) { showToast('⚠️ Commande non trouvée.', 'error'); return; }
         const modal = document.getElementById('detailCommandeModal');
         const content = document.getElementById('detailCommandeContent');
-
-        // Construction des articles modifiables
         let articlesHtml = '';
         if (data.articles && data.articles.length > 0) {
             data.articles.forEach((a, idx) => {
@@ -700,74 +494,40 @@ async function afficherCommande(id) {
                     </div>
                 `;
             });
-        } else {
-            articlesHtml = '<span style="color:#6b7a8f;">Aucun article</span>';
-        }
-
-        const prix = formatNumber(data.prixTotal || 0);
-        const frais = formatNumber(data.fraisLivraison || 0);
-
-        // Liste des statuts
+        } else { articlesHtml = '<span style="color:#6b7a8f;">Aucun article</span>'; }
         const statuts = ['À appeler', 'Validé', 'En-cours', 'Livrée', 'Indisponible', 'Va rappeler', 'Annulée', 'Refusée', 'Reportée'];
         let statutOptions = '';
-        statuts.forEach(s => {
-            const selected = data.statut === s ? 'selected' : '';
-            statutOptions += `<option value="${s}" ${selected}>${s}</option>`;
-        });
-
+        statuts.forEach(s => { const selected = data.statut === s ? 'selected' : ''; statutOptions += `<option value="${s}" ${selected}>${s}</option>`; });
         content.innerHTML = `
             <div class="step-title">📋 ${data.numero || 'N/A'}</div>
             <div style="margin-top:8px;">
-                <div class="recap-item"><span>Vendeur</span>
-                    <span><input type="text" id="editVendeur" value="${data.vendeur || ''}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span>
-                </div>
-                <div class="recap-item"><span>📞 Téléphone</span>
-                    <span><input type="tel" id="editTelephone" value="${data.telephone || ''}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span>
-                </div>
+                <div class="recap-item"><span>Vendeur</span><span><input type="text" id="editVendeur" value="${data.vendeur||''}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>
+                <div class="recap-item"><span>📞 Téléphone</span><span><input type="tel" id="editTelephone" value="${data.telephone||''}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>
                 <div class="recap-item"><span>Articles</span></div>
                 <div id="editArticlesContainer" style="padding:4px 0 8px 16px;">${articlesHtml}</div>
                 <button onclick="ajouterLigneArticleEdit()" class="add-article-btn" style="margin-top:4px;padding:6px;">+ Ajouter un article</button>
-                <div class="recap-item"><span>💰 Montant</span>
-                    <span><input type="number" id="editPrix" value="${data.prixTotal || 0}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span>
-                </div>
-                <div class="recap-item"><span>🚚 Frais livraison</span>
-                    <span><input type="number" id="editFrais" value="${data.fraisLivraison || 0}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span>
-                </div>
-                <div class="recap-item"><span>📍 Lieu</span>
-                    <span><input type="text" id="editQuartier" value="${data.quartier || ''}" placeholder="Quartier" style="width:48%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" />
-                    <input type="text" id="editVille" value="${data.ville || ''}" placeholder="Ville" style="width:48%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span>
-                </div>
-                <div class="recap-item"><span>📌 Statut</span>
-                    <span><select id="editStatut" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;">${statutOptions}</select></span>
-                </div>
+                <div class="recap-item"><span>💰 Montant</span><span><input type="number" id="editPrix" value="${data.prixTotal||0}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>
+                <div class="recap-item"><span>🚚 Frais livraison</span><span><input type="number" id="editFrais" value="${data.fraisLivraison||0}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>
+                <div class="recap-item"><span>📍 Lieu</span><span><input type="text" id="editQuartier" value="${data.quartier||''}" placeholder="Quartier" style="width:48%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /><input type="text" id="editVille" value="${data.ville||''}" placeholder="Ville" style="width:48%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>
+                <div class="recap-item"><span>📌 Statut</span><span><select id="editStatut" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;">${statutOptions}</select></span></div>
                 ${data.note ? `<div class="recap-item"><span>📝 Note</span><span><input type="text" id="editNote" value="${data.note}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>` : ''}
                 <div style="margin-top:12px;border-top:1px solid #e2e8f0;padding-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
                     <button onclick="enregistrerModificationsCommande('${id}')" class="btn-success" style="flex:1;padding:8px;">💾 Enregistrer</button>
                     ${data.telephone ? `<button onclick="appelerClientDepuisCommande('${data.telephone}')" class="btn-primary" style="flex:1;padding:8px;background:#25D366;">📞 Appeler</button>` : ''}
                     <button onclick="closeDetailCommandeModal()" class="btn-secondary" style="flex:1;padding:8px;">Fermer</button>
                 </div>
-            </div>
-        `;
-
+            </div>`;
         modal.classList.add('active');
-
-    } catch(e) {
-        console.error(e);
-        showToast('❌ Erreur affichage.', 'error');
-    }
+    } catch(e) { console.error(e); showToast('❌ Erreur affichage.', 'error'); }
 }
 
 function ajouterLigneArticleEdit() {
     const container = document.getElementById('editArticlesContainer');
     const idx = container.querySelectorAll('.edit-qty').length;
     const div = document.createElement('div');
-    div.style.display = 'flex';
-    div.style.gap = '8px';
-    div.style.marginBottom = '4px';
-    div.innerHTML = `
-        <input type="number" value="1" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="edit-qty" />
-        <input type="text" value="" placeholder="Nom de l'article" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="edit-name" />
-    `;
+    div.style.display = 'flex'; div.style.gap = '8px'; div.style.marginBottom = '4px';
+    div.innerHTML = `<input type="number" value="1" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="edit-qty" />
+        <input type="text" value="" placeholder="Nom" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="edit-name" />`;
     container.appendChild(div);
 }
 
@@ -777,16 +537,10 @@ async function enregistrerModificationsCommande(id) {
         const qtyInputs = document.querySelectorAll('.edit-qty');
         const nameInputs = document.querySelectorAll('.edit-name');
         const articles = [];
-        for (let i = 0; i < qtyInputs.length; i++) {
+        for (let i=0; i<qtyInputs.length; i++) {
             const nom = nameInputs[i].value.trim();
-            if (nom) {
-                articles.push({
-                    quantite: parseInt(qtyInputs[i].value) || 0,
-                    nom: nom
-                });
-            }
+            if (nom) articles.push({ quantite: parseInt(qtyInputs[i].value)||0, nom: nom });
         }
-
         const updateData = {
             vendeur: document.getElementById('editVendeur').value.trim(),
             telephone: document.getElementById('editTelephone').value.trim(),
@@ -799,33 +553,22 @@ async function enregistrerModificationsCommande(id) {
             note: document.getElementById('editNote')?.value.trim() || '',
             dateModification: new Date()
         };
-
         await db.collection('commandes').doc(id).update(updateData);
         playSound('success');
         showToast('✅ Commande mise à jour !', 'success');
         closeDetailCommandeModal();
-        loadCommandes();
-        loadAppels();
-        loadKPI();
-    } catch(e) {
-        console.error('Erreur mise à jour:', e);
-        showToast('❌ Erreur lors de la mise à jour.', 'error');
-    }
+        loadCommandes(); loadAppels(); loadKPI();
+    } catch(e) { console.error(e); showToast('❌ Erreur mise à jour.', 'error'); }
 }
 
 function appelerClientDepuisCommande(telephone) {
     playSound('click');
     const phone = telephone.replace(/[^0-9+]/g, '');
-    if (phone) {
-        window.location.href = `tel:${phone}`;
-    } else {
-        showToast('⚠️ Numéro invalide.', 'error');
-    }
+    if (phone) { window.location.href = `tel:${phone}`; }
+    else { showToast('⚠️ Numéro invalide.', 'error'); }
 }
 
-function closeDetailCommandeModal() {
-    document.getElementById('detailCommandeModal').classList.remove('active');
-}
+function closeDetailCommandeModal() { document.getElementById('detailCommandeModal').classList.remove('active'); }
 
 // ========== COMMANDES CRUD ==========
 async function modifierCommande(id) {
@@ -844,11 +587,10 @@ async function supprimerCommande(id) {
     } catch(e) { showToast('❌ Erreur suppression.', 'error'); }
 }
 
-// ========== ASSIGNER LIVREUR ==========
 async function assignerCommande(commandeId) {
     playSound('click');
     try {
-        const livreurs = await db.collection('livreurs').where('actif', '==', true).get();
+        const livreurs = await db.collection('livreurs').where('actif','==',true).get();
         if (livreurs.empty) { showToast('⚠️ Aucun livreur disponible.', 'error'); return; }
         let list = []; livreurs.forEach(d => list.push({ id: d.id, ...d.data() }));
         const opts = list.map((l,i) => `${i+1}. ${l.nom} (${l.zone||'Sans zone'})`).join('\n');
@@ -863,6 +605,7 @@ async function assignerCommande(commandeId) {
         loadCommandes(); loadAppels(); loadKPI();
     } catch(e) { showToast('❌ Erreur assignation.', 'error'); }
 }
+
 // ========== VENDEURS ==========
 async function loadVendeurs() {
     try {
@@ -1488,7 +1231,7 @@ function addStockRow() {
     const container = document.getElementById('stockArticlesContainer');
     const row = document.createElement('div');
     row.className = 'article-row';
-    row.innerHTML = `<input type="text" class="stock-article-name" placeholder="Nom de l'article" /><input type="number" class="stock-article-qty" placeholder="Quantité" min="1" value="1" />`;
+    row.innerHTML = `<input type="text" class="stock-article-name" placeholder="Nom" /><input type="number" class="stock-article-qty" placeholder="Qté" min="1" value="1" />`;
     container.appendChild(row);
 }
 
@@ -1503,7 +1246,7 @@ async function saveStock() {
         const qty = parseInt(row.querySelector('.stock-article-qty').value);
         if (name && qty > 0) articles.push({ nom: name, quantite: qty });
     });
-    if (articles.length === 0) { showToast('⚠️ Ajoutez au moins un article.', 'error'); return; }
+    if (articles.length === 0) { showToast('⚠️ Ajoutez un article.', 'error'); return; }
     try {
         const vendeurDoc = await db.collection('vendeurs').doc(vendeurId).get();
         const vendeurNom = vendeurDoc.data().nom;
@@ -1534,7 +1277,7 @@ async function rafraichirStock() {
     try {
         const snapshot = await db.collection('stock').get();
         const container = document.getElementById('stockListContainer');
-        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucun stock enregistré.</p>'; return; }
+        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucun stock.</p>'; return; }
         let html = '<div class="list-container">';
         const vendeurs = {};
         snapshot.forEach(doc => {
@@ -1567,7 +1310,7 @@ async function retirerStock(id) {
         if (newQty === 0) { await db.collection('stock').doc(id).delete(); }
         else { await db.collection('stock').doc(id).update({ quantite: newQty }); }
         playSound('success');
-        showToast('✅ Stock retiré avec succès !', 'success');
+        showToast('✅ Stock retiré !', 'success');
         await rafraichirStock();
         loadStockage();
     } catch(e) { console.error(e); showToast('❌ Erreur retrait.', 'error'); }

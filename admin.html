@@ -5,14 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>HDIX - Admin</title>
 
-    <!-- Favicons -->
     <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="assets/favicon.ico" />
-
     <meta name="theme-color" content="#1a2b4c" />
+
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -21,6 +20,7 @@
 <body>
 <div class="app-container">
 
+    <!-- ========== EN-TÊTE ========== -->
     <header class="admin-header">
         <div class="header-left">
             <div class="header-logo">
@@ -35,7 +35,7 @@
         </div>
     </header>
 
-    <!-- NAVIGATION -->
+    <!-- ========== NAVIGATION ========== -->
     <div class="admin-nav">
         <div class="nav-group">
             <button class="nav-btn active" onclick="showSection('commandes')">📦 Commandes</button>
@@ -61,19 +61,19 @@
         <button class="nav-btn" onclick="window.location.href='tresorerie.html'">💰 Trésorerie</button>
     </div>
 
-    <!-- SECTION KPI -->
+    <!-- ========== SECTIONS ========== -->
     <div id="section-kpi" class="section" style="display:none;">
-        <h3 style="display:flex;justify-content:space-between;align-items:center;">📊 KPI <button onclick="loadKPI()" class="refresh-btn">🔄</button></h3>
+        <h3>📊 KPI <button onclick="loadKPI()" class="refresh-btn">🔄</button></h3>
         <div class="kpi-grid">
-            <div class="kpi-card"><div class="number" id="kpiTotal">0</div><div class="label">Total commandes</div><div class="trend trend-up" id="kpiTotalTrend">▲ 0%</div></div>
-            <div class="kpi-card"><div class="number" id="kpiAppeler">0</div><div class="label">À appeler</div><div class="trend trend-up" id="kpiAppelerTrend">▲ 0%</div></div>
-            <div class="kpi-card"><div class="number" id="kpiLivree">0</div><div class="label">Livrées</div><div class="trend trend-up" id="kpiLivreeTrend">▲ 0%</div></div>
-            <div class="kpi-card"><div class="number" id="kpiCA">0</div><div class="label">CA</div><div class="trend trend-up" id="kpiCATrend">▲ 0%</div></div>
+            <div class="kpi-card"><div class="number" id="kpiTotal">0</div><div class="label">Total</div></div>
+            <div class="kpi-card"><div class="number" id="kpiAppeler">0</div><div class="label">À appeler</div></div>
+            <div class="kpi-card"><div class="number" id="kpiLivree">0</div><div class="label">Livrées</div></div>
+            <div class="kpi-card"><div class="number" id="kpiCA">0</div><div class="label">CA</div></div>
         </div>
         <div class="kpi-grid">
             <div class="kpi-card"><div class="number" id="kpiVendeurs">0</div><div class="label">Vendeurs</div></div>
             <div class="kpi-card"><div class="number" id="kpiLivreurs">0</div><div class="label">Livreurs</div></div>
-            <div class="kpi-card"><div class="number" id="kpiTauxLivraison">0%</div><div class="label">Taux livraison</div></div>
+            <div class="kpi-card"><div class="number" id="kpiTauxLivraison">0%</div><div class="label">Taux</div></div>
             <div class="kpi-card"><div class="number" id="kpiMoyenne">0</div><div class="label">Panier moyen</div></div>
         </div>
     </div>
@@ -171,7 +171,7 @@
 
 </div>
 
-<!-- MODALE NOUVELLE COMMANDE -->
+<!-- ========== MODALE NOUVELLE COMMANDE ========== -->
 <div class="modal" id="commandeModal">
     <div class="modal-content">
         <button class="modal-close" onclick="closeCommandeModal()">✕</button>
@@ -180,6 +180,8 @@
             <button class="toggle-option active" id="toggleSaisie" onclick="switchMode('saisie')">✏️ Saisir</button>
             <button class="toggle-option" id="toggleCollage" onclick="switchMode('collage')">📋 Coller</button>
         </div>
+
+        <!-- MODE SAISIE -->
         <div id="modeSaisie">
             <div class="vendeur-select-row"><label>Vendeur</label><select id="commandeVendeurSelect"><option value="">-- Sélectionnez --</option></select></div>
             <div class="form-group"><label>Téléphone client *</label><input type="tel" id="commandeTelephone" placeholder="+241 66 12 34 56" /></div>
@@ -193,6 +195,8 @@
             <div class="form-group"><label>Note</label><textarea id="commandeNote" rows="2" placeholder="Sonner 3 fois..."></textarea></div>
             <button onclick="saveCommande()" class="btn-primary btn-success" style="width:100%;padding:12px;">✅ Enregistrer</button>
         </div>
+
+        <!-- MODE COLLAGE -->
         <div id="modeCollage" style="display:none;">
             <div class="collage-zone">
                 <textarea id="collageInput" rows="6" placeholder="Collez le bon de commande ici..."></textarea>
@@ -206,24 +210,30 @@
     </div>
 </div>
 
-<!-- MODALE CONFIRMATION COLLAGE -->
+<!-- ========== MODALE CONFIRMATION COLLAGE ========== -->
 <div class="modal" id="collageConfirmationModal">
     <div class="modal-content" style="max-width:550px;">
         <button class="modal-close" onclick="closeCollageConfirmation()">✕</button>
-        <div id="collageConfirmationContent">
-            <div class="spinner" style="margin:20px auto;"></div>
-        </div>
+        <div id="collageConfirmationContent"><div class="spinner" style="margin:20px auto;"></div></div>
     </div>
 </div>
 
-<!-- MODALE AJOUTER STOCK -->
+<!-- ========== MODALE DÉTAIL COMMANDE ========== -->
+<div class="modal" id="detailCommandeModal">
+    <div class="modal-content" style="max-width:500px;">
+        <button class="modal-close" onclick="closeDetailCommandeModal()">✕</button>
+        <div id="detailCommandeContent"><div class="spinner" style="margin:20px auto;"></div></div>
+    </div>
+</div>
+
+<!-- ========== MODALES STOCK ========== -->
 <div class="modal" id="stockModal">
     <div class="modal-content">
         <button class="modal-close" onclick="closeStockModal()">✕</button>
         <div class="step-title">📦 AJOUTER STOCK</div>
         <div class="vendeur-select-row"><label>Vendeur</label><select id="stockVendeurSelect"><option value="">-- Sélectionnez --</option></select></div>
-        <div id="stockArticlesContainer"><div class="article-row"><input type="text" class="stock-article-name" placeholder="Nom de l'article" /><input type="number" class="stock-article-qty" placeholder="Quantité" min="1" value="1" /></div></div>
-        <button onclick="addStockRow()" class="add-article-btn">+ Ajouter un autre article</button>
+        <div id="stockArticlesContainer"><div class="article-row"><input type="text" class="stock-article-name" placeholder="Nom" /><input type="number" class="stock-article-qty" placeholder="Qté" min="1" value="1" /></div></div>
+        <button onclick="addStockRow()" class="add-article-btn">+ Ajouter</button>
         <div style="display:flex;gap:10px;margin-top:16px;">
             <button onclick="consulterStock()" class="btn-secondary" style="flex:1;">📦 Consulter stock</button>
             <button onclick="saveStock()" class="btn-primary btn-success" style="flex:1;">✅ Valider</button>
@@ -231,7 +241,6 @@
     </div>
 </div>
 
-<!-- MODALE CONSULTER STOCK -->
 <div class="modal" id="consulterStockModal">
     <div class="modal-content">
         <button class="modal-close" onclick="closeConsulterStockModal()">✕</button>
@@ -240,18 +249,8 @@
             <select id="stockFiltreVendeur" style="flex:2;"><option value="all">Tous les vendeurs</option></select>
             <button onclick="rafraichirStock()" class="btn-secondary" style="flex:1;">🔄 Rafraîchir</button>
         </div>
-        <div id="stockListContainer"><p class="empty-message">Chargement du stock...</p></div>
+        <div id="stockListContainer"><p class="empty-message">Chargement...</p></div>
         <button onclick="closeConsulterStockModal()" class="btn-primary" style="margin-top:12px;">⬅️ Retour</button>
-    </div>
-</div>
-
-<!-- MODALE DÉTAIL COMMANDE -->
-<div class="modal" id="detailCommandeModal">
-    <div class="modal-content" style="max-width:500px;">
-        <button class="modal-close" onclick="closeDetailCommandeModal()">✕</button>
-        <div id="detailCommandeContent">
-            <div class="spinner" style="margin:20px auto;"></div>
-        </div>
     </div>
 </div>
 
