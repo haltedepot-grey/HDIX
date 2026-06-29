@@ -1,4 +1,4 @@
-// admin-script.js - Version simplifiée avec numérotation et sélection multiple
+// admin-script.js - Version complète avec gestion des livreurs et calcul des gains à la livraison
 
 // ========== SONS ==========
 let clickSound = null, successSound = null, errorSound = null;
@@ -97,6 +97,12 @@ async function loadCommandes() {
             
             const checkbox = selectionMode ? `<input type="checkbox" class="commande-check" value="${doc.id}" onchange="updateSelection()" />` : '';
             
+            // Déterminer le type de livreur pour affichage
+            let typeLabel = '';
+            if (data.livreurType === 'interne') typeLabel = '🔒';
+            else if (data.livreurContrat === 'garde_tout') typeLabel = '💰';
+            else if (data.livreurContrat === 'partage') typeLabel = '📊';
+            
             html += `<div class="commande-item" onclick="afficherCommande('${doc.id}')">
                 ${checkbox}
                 <span class="numero">${data.numero||'N/A'}</span>
@@ -108,7 +114,9 @@ async function loadCommandes() {
                     <button onclick="event.stopPropagation(); modifierCommande('${doc.id}')" title="Modifier">✏️</button>
                     <button onclick="event.stopPropagation(); supprimerCommande('${doc.id}')" title="Supprimer">🗑️</button>
                     <button onclick="event.stopPropagation(); afficherCommande('${doc.id}')" title="Voir">👁️</button>
-                    ${data.statut !== 'Livrée' ? `<button onclick="event.stopPropagation(); assignerCommande('${doc.id}')">🚚</button>` : ''}
+                    ${data.statut !== 'Livrée' && data.statut !== 'En-cours' ? `<button onclick="event.stopPropagation(); assignerCommande('${doc.id}')" title="Assigner">🚚</button>` : ''}
+                    ${data.statut === 'En-cours' && data.livreurId ? `<button onclick="event.stopPropagation(); marquerLivree('${doc.id}')" title="Marquer livrée" style="background:#27ae60;color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;">✅</button>` : ''}
+                    ${data.statut === 'Livrée' ? `<span style="font-size:11px;color:#6b7a8f;">${typeLabel}</span>` : ''}
                 </span>
             </div>`;
         });
@@ -157,9 +165,13 @@ async function assignerSelection() {
         livreursList.push({ id: doc.id, ...doc.data() });
     });
     
-    let options = livreursList.map((l, index) => 
-        `${index + 1}. ${l.nom} (${l.zone || 'Sans zone'})`
-    ).join('\n');
+    let options = livreursList.map((l, index) => {
+        let typeLabel = '';
+        if (l.type === 'interne') typeLabel = '🔒 Interne';
+        else if (l.contrat === 'garde_tout') typeLabel = '💰 Garde tout';
+        else typeLabel = '📊 Partage';
+        return `${index + 1}. ${l.nom} (${l.zone || 'Sans zone'}) - ${typeLabel}`;
+    }).join('\n');
     
     const choix = prompt(
         `📋 ${commandesSelectionnees.length} commandes sélectionnées.\n\nSélectionnez un livreur :\n\n${options}\n\nEntrez le numéro :`
@@ -180,6 +192,8 @@ async function assignerSelection() {
             await db.collection('commandes').doc(commandeId).update({
                 livreurId: livreur.id,
                 livreurNom: livreur.nom,
+                livreurType: livreur.type || 'externe',
+                livreurContrat: livreur.contrat || 'partage',
                 statut: 'En-cours',
                 dateAssignation: new Date()
             });
@@ -189,12 +203,141 @@ async function assignerSelection() {
         showToast(`✅ ${commandesSelectionnees.length} commandes assignées à ${livreur.nom} !`, 'success');
         commandesSelectionnees = [];
         loadCommandes();
-        loadAppels();
         loadKPI();
     } catch(e) {
         console.error('Erreur assignation multiple:', e);
         showToast('❌ Erreur lors de l\'assignation.', 'error');
     }
+}
+
+// ========== CALCUL DES GAINS À LA LIVRAISON ==========
+function calculerGainsLivraison(livreur, fraisLivraison) {
+    // Taux par zone pour les livreurs externes en partage
+    const tauxPartAgent = {
+        'Libreville': 500,
+        'Nzeng-Ayong': 500,
+        'Akanda': 1000,
+        'Owendo': 1000,
+        'zones_difficiles': 1000,
+        'autres': 1000
+    };
+    
+    let partAgent = 0;
+    let partLivreur = 0;
+    let mode = '';
+    
+    if (livreur.type === 'interne' && livreur.contrat === 'salarie') {
+        // INTERNE : L'entreprise garde tout
+        partAgent = fraisLivraison;
+        partLivreur = 0;
+        mode = 'interne';
+    } else if (livreur.type === 'externe' && livreur.contrat === 'garde_tout') {
+        // EXTERNE GARDE TOUT : Tout pour le livreur
+        partAgent = 0;
+        partLivreur = fraisLivraison;
+        mode = 'garde_tout';
+    } else {
+        // EXTERNE PARTAGE : Taux fixe pour l'agent, reste pour le livreur
+        const zone = livreur.zone || 'Libreville';
+        partAgent = tauxPartAgent[zone] || 500;
+        partLivreur = Math.max(0, fraisLivraison - partAgent);
+        mode = 'partage';
+    }
+    
+    return {
+        total: fraisLivraison,
+        partAgent: partAgent,
+        partLivreur: partLivreur,
+        mode: mode,
+        fraisLivraison: fraisLivraison
+    };
+}
+
+// ========== MARQUER UNE COMMANDE COMME LIVRÉE ==========
+async function marquerLivree(commandeId) {
+    playSound('click');
+    if (!confirm('✅ Marquer cette commande comme livrée ?\n\nLes gains seront calculés automatiquement.')) return;
+    
+    showSpinner();
+    try {
+        // 1. Récupérer la commande
+        const cmdDoc = await db.collection('commandes').doc(commandeId).get();
+        if (!cmdDoc.exists) { showToast('❌ Commande introuvable.', 'error'); hideSpinner(); return; }
+        const cmd = cmdDoc.data();
+        
+        // 2. Vérifier que la commande a un livreur
+        if (!cmd.livreurId) { 
+            showToast('⚠️ Cette commande n\'a pas de livreur assigné.', 'error'); 
+            hideSpinner(); 
+            return; 
+        }
+        
+        // 3. Récupérer le livreur
+        const livreurDoc = await db.collection('livreurs').doc(cmd.livreurId).get();
+        if (!livreurDoc.exists) { showToast('❌ Livreur introuvable.', 'error'); hideSpinner(); return; }
+        const livreur = livreurDoc.data();
+        
+        // 4. Calculer les gains
+        const fraisLivraison = cmd.fraisLivraison || 0;
+        const gains = calculerGainsLivraison(livreur, fraisLivraison);
+        
+        // 5. Mettre à jour la commande
+        await db.collection('commandes').doc(commandeId).update({
+            statut: 'Livrée',
+            dateLivraison: new Date(),
+            gains: gains,
+            partAgent: gains.partAgent,
+            partLivreur: gains.partLivreur
+        });
+        
+        // 6. Mettre à jour les gains du livreur
+        await db.collection('livreurs').doc(cmd.livreurId).update({
+            'gains.total_collecte': (livreur.gains?.total_collecte || 0) + gains.total,
+            'gains.part_livreur': (livreur.gains?.part_livreur || 0) + gains.partLivreur,
+            'gains.part_agent': (livreur.gains?.part_agent || 0) + gains.partAgent,
+            'gains.derniere_livraison': new Date()
+        });
+        
+        // 7. Enregistrer dans la trésorerie (pour le suivi)
+        await db.collection('tresorerie').add({
+            type: 'livraison',
+            commandeId: commandeId,
+            numero: cmd.numero || 'N/A',
+            livreurId: cmd.livreurId,
+            livreurNom: cmd.livreurNom || 'Inconnu',
+            montant: gains.total,
+            partAgent: gains.partAgent,
+            partLivreur: gains.partLivreur,
+            mode: gains.mode,
+            date: new Date(),
+            description: `Livraison ${cmd.numero} - ${cmd.livreurNom}`
+        });
+        
+        playSound('success');
+        
+        // Message de confirmation avec détails
+        let modeLabel = '';
+        if (gains.mode === 'interne') modeLabel = '🔒 Interne';
+        else if (gains.mode === 'garde_tout') modeLabel = '💰 Garde tout';
+        else modeLabel = '📊 Partage';
+        
+        showToast(
+            `✅ Commande ${cmd.numero || ''} livrée !\n` +
+            `📊 ${modeLabel}\n` +
+            `💰 Livreur: ${formatNumber(gains.partLivreur)} FCFA\n` +
+            `🏢 Agent: ${formatNumber(gains.partAgent)} FCFA`,
+            'success'
+        );
+        
+        loadCommandes();
+        loadLivreurs();
+        loadTresorerie();
+        loadKPI();
+    } catch (error) {
+        console.error('Erreur livraison:', error);
+        showToast('❌ Erreur lors de la livraison.', 'error');
+    }
+    hideSpinner();
 }
 
 // ========== MODALE NOUVELLE COMMANDE ==========
@@ -307,7 +450,7 @@ async function saveCommande() {
         playSound('success');
         showToast(`✅ Commande ${numero} enregistrée !`, 'success');
         closeCommandeModal();
-        loadCommandes(); loadAppels(); loadKPI();
+        loadCommandes(); loadKPI();
     } catch(e) { console.error(e); showToast('❌ Erreur enregistrement.', 'error'); }
 }
 
@@ -353,124 +496,6 @@ function analyserTexte(text) {
     return result;
 }
 
-// ========== APPELS ==========
-let fileAppel = [], indexAppel = 0;
-
-async function loadAppels() {
-    try {
-        const snapshot = await db.collection('commandes').where('statut','==','À appeler').orderBy('dateCreation','asc').get();
-        const container = document.getElementById('appelsContainer');
-        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune commande en attente.</p>'; return; }
-        let html = '';
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            html += `<div class="commande-item"><span class="numero">${data.numero}</span><span class="vendeur">${data.vendeur}</span>
-                <span class="montant">${formatNumber(data.prixTotal)} FCFA</span><span class="statut statut-appel">${data.statut}</span></div>`;
-        });
-        container.innerHTML = html;
-    } catch(e) { console.error(e); }
-}
-
-function lancerAppelSuivant() {
-    playSound('click');
-    db.collection('commandes').where('statut','==','À appeler').orderBy('dateCreation','asc').get()
-        .then(snapshot => {
-            if (snapshot.empty) { showToast('✅ Aucune commande en attente.', 'success'); return; }
-            fileAppel = []; snapshot.forEach(doc => fileAppel.push({ id: doc.id, data: doc.data() }));
-            indexAppel = 0;
-            afficherAppel();
-        })
-        .catch(e => { console.error(e); showToast('❌ Erreur chargement appels.', 'error'); });
-}
-
-function afficherAppel() {
-    if (indexAppel >= fileAppel.length) {
-        fermerAppelModal();
-        showToast('✅ Tous les appels traités !', 'success');
-        loadAppels(); loadCommandes(); loadKPI();
-        return;
-    }
-    const item = fileAppel[indexAppel];
-    const data = item.data;
-    const modal = document.getElementById('appelModal');
-    const content = document.getElementById('appelContent');
-    const articles = data.articles ? data.articles.map(a => `${a.quantite} x ${a.nom}`).join(', ') : '';
-    const telephone = data.telephone || '';
-    const statuts = ['À appeler', 'Validé', 'En-cours', 'Livrée', 'Indisponible', 'Va rappeler', 'Annulée', 'Refusée', 'Reportée'];
-    let statutOptions = '';
-    statuts.forEach(s => { const selected = data.statut === s ? 'selected' : ''; statutOptions += `<option value="${s}" ${selected}>${s}</option>`; });
-    content.innerHTML = `
-        <div class="step-title">📞 APPEL CLIENT</div>
-        <div class="step-subtitle">Bon ${indexAppel+1} sur ${fileAppel.length}</div>
-        <div class="recap-item"><span>Commande</span><span>${data.numero}</span></div>
-        <div class="recap-item"><span>Vendeur</span><span>${data.vendeur}</span></div>
-        <div class="recap-item"><span>Articles</span><span>${articles}</span></div>
-        <div class="recap-item"><span>Lieu</span><span>${data.quartier}, ${data.ville}</span></div>
-        <div class="recap-item"><span>Montant</span><span>${formatNumber(data.prixTotal)} FCFA</span></div>
-        <div class="recap-item"><span>📞 Téléphone</span><span><strong>${telephone || 'Non renseigné'}</strong></span></div>
-        <div class="recap-item"><span>📌 Statut</span>
-            <span><select id="appelStatut" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;">${statutOptions}</select></span>
-        </div>
-        <div style="margin:16px 0;display:flex;gap:10px;flex-wrap:wrap;">
-            ${telephone ? `<button onclick="appelerClient('${item.id}')" class="btn-primary" style="flex:1;">📞 Appeler</button>` : ''}
-            <button onclick="whatsappClient('${item.id}')" class="btn-primary" style="flex:1;background:#25D366;">💬 WhatsApp</button>
-            <button onclick="smsClient('${item.id}')" class="btn-primary" style="flex:1;background:#8e44ad;">🤖 IA</button>
-        </div>
-        <div style="margin:16px 0;display:flex;gap:10px;flex-wrap:wrap;">
-            <button onclick="validerAppel('${item.id}')" class="btn-success" style="flex:1;padding:12px;">✅ Valider</button>
-            <button onclick="fermerAppelModal()" class="btn-secondary" style="flex:1;padding:12px;">Fermer</button>
-        </div>
-        <p class="info-text">Le prochain bon apparaîtra automatiquement après validation.</p>`;
-    modal.classList.add('active');
-}
-
-function fermerAppelModal() { document.getElementById('appelModal').classList.remove('active'); }
-document.getElementById('appelModal').addEventListener('click', function(e) { if (e.target === this) fermerAppelModal(); });
-
-async function validerAppel(id) {
-    const statut = document.getElementById('appelStatut').value;
-    try {
-        await db.collection('commandes').doc(id).update({ statut: statut, dateAppel: new Date() });
-        playSound('success');
-        showToast(`✅ Commande ${statut}`, 'success');
-        indexAppel++;
-        afficherAppel();
-        loadCommandes(); loadAppels(); loadKPI();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-function appelerClient(id) {
-    playSound('click');
-    db.collection('commandes').doc(id).get().then(doc => {
-        const data = doc.data();
-        const phone = data.telephone || prompt('Numéro du client :');
-        if (phone) { window.location.href = `tel:${phone.replace(/[^0-9+]/g, '')}`; }
-        showToast('📞 Appel en cours...', 'info');
-    });
-}
-
-function whatsappClient(id) {
-    playSound('click');
-    db.collection('commandes').doc(id).get().then(doc => {
-        const data = doc.data();
-        const phone = data.telephone || prompt('Numéro WhatsApp :');
-        if (phone) { window.open(`https://wa.me/${phone.replace(/[^0-9+]/g,'').replace('+','')}?text=Bonjour, nous vous confirmons votre livraison (${data.numero}).`, '_blank'); }
-    });
-}
-
-function smsClient(id) {
-    playSound('click');
-    db.collection('commandes').doc(id).get().then(doc => {
-        const data = doc.data();
-        const phone = data.telephone || prompt('Numéro :');
-        if (phone) {
-            const lien = `https://hdix.vercel.app/confirmation/${id}`;
-            const msg = `📦 Commande ${data.numero}\nConfirmez : OK -> ${lien}/ok | Appelez-moi -> ${lien}/appel | Indisponible -> ${lien}/non`;
-            window.open(`https://wa.me/${phone.replace(/[^0-9+]/g,'').replace('+','')}?text=${encodeURIComponent(msg)}`, '_blank');
-        }
-    });
-}
-
 // ========== MODALE DÉTAIL ==========
 async function afficherCommande(id) {
     playSound('click');
@@ -507,9 +532,19 @@ async function afficherCommande(id) {
                 <div class="recap-item"><span>📍 Lieu</span><span><input type="text" id="editQuartier" value="${data.quartier||''}" placeholder="Quartier" style="width:48%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /><input type="text" id="editVille" value="${data.ville||''}" placeholder="Ville" style="width:48%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>
                 <div class="recap-item"><span>📌 Statut</span><span><select id="editStatut" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;">${statutOptions}</select></span></div>
                 ${data.note ? `<div class="recap-item"><span>📝 Note</span><span><input type="text" id="editNote" value="${data.note}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>` : ''}
+                ${data.gains ? `
+                    <div style="margin-top:12px;border-top:1px solid #e2e8f0;padding-top:12px;">
+                        <div style="font-weight:600;color:#2c3e50;">📊 Gains de la livraison</div>
+                        <div class="recap-item"><span>💰 Total collecté</span><span>${formatNumber(data.gains.total || 0)} FCFA</span></div>
+                        <div class="recap-item"><span>🚚 Part livreur</span><span>${formatNumber(data.gains.partLivreur || 0)} FCFA</span></div>
+                        <div class="recap-item"><span>🏢 Part agent</span><span>${formatNumber(data.gains.partAgent || 0)} FCFA</span></div>
+                        <div class="recap-item"><span>📋 Mode</span><span>${data.gains.mode || 'N/A'}</span></div>
+                    </div>
+                ` : ''}
                 <div style="margin-top:12px;border-top:1px solid #e2e8f0;padding-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
                     <button onclick="enregistrerModificationsCommande('${id}')" class="btn-success" style="flex:1;padding:8px;">💾 Enregistrer</button>
                     ${data.telephone ? `<button onclick="appelerClientDepuisCommande('${data.telephone}')" class="btn-primary" style="flex:1;padding:8px;background:#25D366;">📞 Appeler</button>` : ''}
+                    ${data.statut === 'En-cours' && data.livreurId ? `<button onclick="marquerLivree('${id}')" class="btn-success" style="flex:1;padding:8px;background:#27ae60;">✅ Livrée</button>` : ''}
                     <button onclick="closeDetailCommandeModal()" class="btn-secondary" style="flex:1;padding:8px;">Fermer</button>
                 </div>
             </div>`;
@@ -553,7 +588,7 @@ async function enregistrerModificationsCommande(id) {
         playSound('success');
         showToast('✅ Commande mise à jour !', 'success');
         closeDetailCommandeModal();
-        loadCommandes(); loadAppels(); loadKPI();
+        loadCommandes(); loadKPI();
     } catch(e) { console.error(e); showToast('❌ Erreur mise à jour.', 'error'); }
 }
 
@@ -579,7 +614,7 @@ async function supprimerCommande(id) {
         await db.collection('commandes').doc(id).delete();
         playSound('success');
         showToast('🗑️ Commande supprimée.', 'success');
-        loadCommandes(); loadAppels(); loadKPI();
+        loadCommandes(); loadKPI();
     } catch(e) { showToast('❌ Erreur suppression.', 'error'); }
 }
 
@@ -589,16 +624,29 @@ async function assignerCommande(commandeId) {
         const livreurs = await db.collection('livreurs').where('actif','==',true).get();
         if (livreurs.empty) { showToast('⚠️ Aucun livreur disponible.', 'error'); return; }
         let list = []; livreurs.forEach(d => list.push({ id: d.id, ...d.data() }));
-        const opts = list.map((l,i) => `${i+1}. ${l.nom} (${l.zone||'Sans zone'})`).join('\n');
+        const opts = list.map((l,i) => {
+            let typeLabel = '';
+            if (l.type === 'interne') typeLabel = '🔒 Interne';
+            else if (l.contrat === 'garde_tout') typeLabel = '💰 Garde tout';
+            else typeLabel = '📊 Partage';
+            return `${i+1}. ${l.nom} (${l.zone||'Sans zone'}) - ${typeLabel}`;
+        }).join('\n');
         const choix = prompt(`Sélectionnez un livreur:\n\n${opts}\n\nEntrez le numéro:`);
         if (!choix) return;
         const idx = parseInt(choix)-1;
         if (isNaN(idx)||idx<0||idx>=list.length) { showToast('⚠️ Sélection invalide.', 'error'); return; }
         const livreur = list[idx];
-        await db.collection('commandes').doc(commandeId).update({ livreurId: livreur.id, livreurNom: livreur.nom, statut: 'En-cours', dateAssignation: new Date() });
+        await db.collection('commandes').doc(commandeId).update({ 
+            livreurId: livreur.id, 
+            livreurNom: livreur.nom,
+            livreurType: livreur.type || 'externe',
+            livreurContrat: livreur.contrat || 'partage',
+            statut: 'En-cours', 
+            dateAssignation: new Date() 
+        });
         playSound('success');
         showToast(`✅ Commande assignée à ${livreur.nom} !`, 'success');
-        loadCommandes(); loadAppels(); loadKPI();
+        loadCommandes(); loadKPI();
     } catch(e) { showToast('❌ Erreur assignation.', 'error'); }
 }
 
@@ -884,9 +932,29 @@ async function loadLivreurs() {
             const userSnap = await db.collection('users').where('livreurId','==',doc.id).get();
             let code = 'N/A';
             if (!userSnap.empty) { code = userSnap.docs[0].data().code_secret || 'N/A'; }
-            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>📞 ${data.telephone} | 🔑 ${code}</small></div>
-                <div><button onclick="editLivreur('${doc.id}')" class="btn-edit">✏️</button>
-                <button onclick="deleteLivreur('${doc.id}')" class="btn-delete">🗑️</button></div></div>`;
+            
+            // Type de contrat
+            let typeLabel = '';
+            if (data.type === 'interne') typeLabel = '🔒 Interne';
+            else if (data.contrat === 'garde_tout') typeLabel = '💰 Garde tout';
+            else typeLabel = '📊 Partage';
+            
+            // Gains
+            const gains = data.gains || {};
+            const totalCollecte = gains.total_collecte || 0;
+            const partLivreur = gains.part_livreur || 0;
+            
+            html += `<div class="list-item">
+                <div>
+                    <strong>${data.nom}</strong>
+                    <br><small>📞 ${data.telephone} | ${typeLabel} | 📍 ${data.zone||'N/A'}</small>
+                    <br><small>💰 ${formatNumber(partLivreur)} FCFA / ${formatNumber(totalCollecte)} FCFA collecté</small>
+                </div>
+                <div>
+                    <button onclick="editLivreur('${doc.id}')" class="btn-edit">✏️</button>
+                    <button onclick="deleteLivreur('${doc.id}')" class="btn-delete">🗑️</button>
+                </div>
+            </div>`;
         }
         html += '</div>';
         container.innerHTML = html;
@@ -897,23 +965,52 @@ function openLivreurForm() {
     playSound('click');
     const nom = prompt('Nom du livreur :'); if (!nom) return;
     const tel = prompt('Téléphone :'); if (!tel) return;
-    const zone = prompt('Zone :'); if (!zone) return;
+    
+    // Choix du type
+    const choixType = prompt(
+        `Choisissez le type de contrat :\n\n` +
+        `1. 🔒 Interne (salarié) - L'entreprise garde tout\n` +
+        `2. 📊 Externe - Partage (fixe + livreur)\n` +
+        `3. 💰 Externe - Garde tout (tout pour le livreur)\n\n` +
+        `Entrez 1, 2 ou 3 :`
+    );
+    
+    let type = 'externe';
+    let contrat = 'partage';
+    if (choixType === '1') { type = 'interne'; contrat = 'salarie'; }
+    else if (choixType === '3') { type = 'externe'; contrat = 'garde_tout'; }
+    else { type = 'externe'; contrat = 'partage'; }
+    
+    const zone = prompt('Zone de livraison :'); if (!zone) return;
     const cap = parseInt(prompt('Capacité :') || '10');
     const actif = confirm('Activer ?');
     let code = generateCodeSecret();
-    db.collection('livreurs').add({ nom, telephone: tel, zone, capacite: cap||10, actif })
-        .then(docRef => {
-            return db.collection('users').add({ nom, role: 'livreur', code_secret: code, telephone: tel, livreurId: docRef.id, dateCreation: new Date() });
-        })
-        .then(() => {
-            playSound('success');
-            showToast(`✅ Livreur ajouté ! Code: ${code}`, 'success');
-            if (confirm(`Envoyer le code (${code}) par WhatsApp ?`)) {
-                const phone = tel.replace('+','');
-                window.open(`https://wa.me/${phone}?text=Bonjour ${nom}, votre code livreur HDIX est: ${code}`, '_blank');
-            }
-            loadLivreurs(); loadKPI();
-        }).catch(e => { showToast('❌ Erreur.', 'error'); });
+    const tauxPartAgent = {
+        'Libreville': 500,
+        'Nzeng-Ayong': 500,
+        'Akanda': 1000,
+        'Owendo': 1000,
+        'zones_difficiles': 1000,
+        'autres': 1000
+    };
+    
+    db.collection('livreurs').add({ 
+        nom, telephone: tel, zone, capacite: cap||10, actif, type, contrat,
+        taux_part_agent: tauxPartAgent,
+        gains: { total_collecte: 0, part_livreur: 0, part_agent: 0 }
+    })
+    .then(docRef => {
+        return db.collection('users').add({ nom, role: 'livreur', code_secret: code, telephone: tel, livreurId: docRef.id, dateCreation: new Date() });
+    })
+    .then(() => {
+        playSound('success');
+        showToast(`✅ Livreur ajouté ! Code: ${code}`, 'success');
+        if (confirm(`Envoyer le code (${code}) par WhatsApp ?`)) {
+            const phone = tel.replace('+','');
+            window.open(`https://wa.me/${phone}?text=Bonjour ${nom}, votre code livreur HDIX est: ${code}`, '_blank');
+        }
+        loadLivreurs(); loadKPI();
+    }).catch(e => { showToast('❌ Erreur.', 'error'); });
 }
 
 async function deleteLivreur(id) {
@@ -966,99 +1063,147 @@ async function resetLivreurCode(id) {
     } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
-// ========== STOCKAGE ==========
-async function loadStockage() {
-    try {
-        const vendeurs = await db.collection('vendeurs').get();
-        const container = document.getElementById('stockageList');
-        const resume = document.getElementById('stockageResume');
-        const dettes = document.getElementById('stockageDettes');
-        if (vendeurs.empty) { container.innerHTML = '<p class="empty-message">Aucun vendeur.</p>'; return; }
-        let html = '<div class="list-container">', totalCasiers=0, totalDettes=0;
-        for (const doc of vendeurs.docs) {
-            const data = doc.data();
-            const s = await db.collection('stockage').where('vendeurId','==',doc.id).where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
-            let casiers=0, dette=0;
-            if (!s.empty) { const d=s.docs[0].data(); casiers=d.casiers||0; dette=d.dette||0; }
-            totalCasiers += casiers; totalDettes += dette;
-            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>Casiers: ${casiers} | Dette: ${formatNumber(dette)} FCFA</small></div>
-                <div><button onclick="ajouterCasier('${doc.id}')" class="btn-edit">+</button>
-                <button onclick="retirerCasier('${doc.id}')" class="btn-delete">-</button></div></div>`;
-        }
-        html += '</div>'; container.innerHTML = html;
-        resume.innerHTML = `<div style="font-size:18px;font-weight:700;">${totalCasiers}</div><div style="color:#6b7a8f;">casiers</div>`;
-        dettes.innerHTML = `<div style="font-size:18px;font-weight:700;color:${totalDettes>0?'#c0392b':'#2d7d46'};">${formatNumber(totalDettes)} FCFA</div><div style="color:#6b7a8f;">dette</div>`;
-    } catch(e) { console.error(e); }
-}
-
-async function ajouterCasier(vendeurId) {
-    const n = parseInt(prompt('Nombre de casiers à ajouter :')||'1');
-    if (isNaN(n)||n<=0) return;
-    try {
-        const s = await db.collection('stockage').where('vendeurId','==',vendeurId).where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
-        if (s.empty) {
-            await db.collection('stockage').add({ vendeurId, casiers: n, dette: n*5000, mois: new Date().getMonth()+1, annee: new Date().getFullYear() });
-        } else {
-            const doc = s.docs[0]; const data=doc.data();
-            const newCasiers=(data.casiers||0)+n;
-            await db.collection('stockage').doc(doc.id).update({ casiers: newCasiers, dette: newCasiers*5000 });
-        }
-        playSound('success');
-        showToast(`✅ ${n} casier(s) ajouté(s)`, 'success');
-        loadStockage();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-async function retirerCasier(vendeurId) {
-    try {
-        const s = await db.collection('stockage').where('vendeurId','==',vendeurId).where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
-        if (s.empty) { showToast('⚠️ Aucun casier.', 'error'); return; }
-        const doc=s.docs[0]; const data=doc.data();
-        const actuel=data.casiers||0;
-        if (actuel<=0) { showToast('⚠️ Aucun casier.', 'error'); return; }
-        const n=parseInt(prompt(`Casiers actuels: ${actuel}. Combien retirer ?`)||'1');
-        if (isNaN(n)||n<=0) return;
-        const nouveau=Math.max(0, actuel-n);
-        await db.collection('stockage').doc(doc.id).update({ casiers: nouveau, dette: nouveau*5000 });
-        playSound('success');
-        showToast(`✅ ${n} casier(s) retiré(s)`, 'success');
-        loadStockage();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-async function activerPrelevements() {
+// ========== RÉPARER LES LIVREURS (MIGRATION) ==========
+async function reparerLivreurs() {
     playSound('click');
-    if (!confirm('Activer les prélèvements pour tous les vendeurs ?')) return;
-    try {
-        const s = await db.collection('stockage').where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
-        let count=0;
-        for(const doc of s.docs) { await db.collection('stockage').doc(doc.id).update({ prelevementsActifs: true, dateActivation: new Date() }); count++; }
-        playSound('success');
-        showToast(`✅ Prélèvements activés pour ${count} vendeur(s)`, 'success');
-        loadStockage();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
+    if (!confirm('🔧 Voulez-vous réparer automatiquement les comptes livreurs ?\n\nCette action va :\n- Vérifier tous les livreurs\n- Ajouter les champs manquants (type, contrat, gains)\n- Créer les comptes utilisateurs manquants\n- Générer des codes secrets pour ceux qui n\'en ont pas')) {
+        return;
+    }
 
-async function appliquerPenalites() {
-    playSound('click');
-    if (!confirm('Appliquer les pénalités de 2.500 FCFA/jour ?')) return;
+    showSpinner();
+    let stats = { total: 0, crees: 0, migres: 0, dejaOk: 0, erreurs: 0 };
+    let details = [];
+
     try {
-        const s = await db.collection('stockage').where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
-        let count=0;
-        for(const doc of s.docs) {
-            const data=doc.data();
-            if(data.dette>0) {
-                await db.collection('stockage').doc(doc.id).update({ dette: (data.dette||0)+2500, penalites: (data.penalites||0)+2500, dernierJourRetard: new Date() });
-                count++;
+        const livreursSnap = await db.collection('livreurs').get();
+        stats.total = livreursSnap.size;
+
+        if (livreursSnap.empty) {
+            hideSpinner();
+            showToast('⚠️ Aucun livreur à réparer.', 'info');
+            return;
+        }
+
+        for (const doc of livreursSnap.docs) {
+            const livreurData = doc.data();
+            const livreurId = doc.id;
+            let modifie = false;
+
+            // 1. Ajouter les champs manquants (type, contrat, gains)
+            const updateData = {};
+            if (!livreurData.type) {
+                updateData.type = 'externe';
+                updateData.contrat = 'partage';
+                modifie = true;
+            }
+            if (!livreurData.contrat) {
+                updateData.contrat = 'partage';
+                modifie = true;
+            }
+            if (!livreurData.gains) {
+                updateData.gains = { total_collecte: 0, part_livreur: 0, part_agent: 0 };
+                modifie = true;
+            }
+            if (!livreurData.taux_part_agent) {
+                updateData.taux_part_agent = {
+                    'Libreville': 500,
+                    'Nzeng-Ayong': 500,
+                    'Akanda': 1000,
+                    'Owendo': 1000,
+                    'zones_difficiles': 1000,
+                    'autres': 1000
+                };
+                modifie = true;
+            }
+
+            if (modifie) {
+                await db.collection('livreurs').doc(livreurId).update(updateData);
+                stats.migres++;
+                details.push(`🔄 ${livreurData.nom} : champs ajoutés`);
+            }
+
+            // 2. Vérifier l'utilisateur associé
+            const userSnap = await db.collection('users')
+                .where('livreurId', '==', livreurId)
+                .get();
+
+            if (!userSnap.empty) {
+                const userData = userSnap.docs[0].data();
+                if (!userData.code_secret) {
+                    const newCode = generateCodeSecret();
+                    await db.collection('users').doc(userSnap.docs[0].id).update({
+                        code_secret: newCode
+                    });
+                    stats.dejaOk++;
+                    details.push(`✅ ${livreurData.nom} : code secret ajouté (${newCode})`);
+                } else {
+                    stats.dejaOk++;
+                    details.push(`✅ ${livreurData.nom} : déjà OK`);
+                }
+            } else {
+                const newCode = generateCodeSecret();
+                await db.collection('users').add({
+                    nom: livreurData.nom,
+                    role: 'livreur',
+                    code_secret: newCode,
+                    telephone: livreurData.telephone || '',
+                    livreurId: livreurId,
+                    dateCreation: new Date()
+                });
+                stats.crees++;
+                details.push(`🆕 ${livreurData.nom} : compte créé (${newCode})`);
             }
         }
+
+        hideSpinner();
         playSound('success');
-        showToast(`✅ Pénalités appliquées à ${count} vendeur(s)`, 'success');
-        loadStockage();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
+
+        let message = `✅ Réparation des livreurs terminée !\n\n`;
+        message += `📊 Total livreurs : ${stats.total}\n`;
+        message += `🔄 Livreurs migrés : ${stats.migres}\n`;
+        message += `🆕 Comptes créés : ${stats.crees}\n`;
+        message += `✅ Déjà OK : ${stats.dejaOk}\n`;
+        message += `❌ Erreurs : ${stats.erreurs}\n\n`;
+        message += `📋 Détail :\n${details.slice(0, 20).join('\n')}`;
+        if (details.length > 20) {
+            message += `\n... et ${details.length - 20} autres.`;
+        }
+
+        alert(message);
+        loadLivreurs();
+
+        if (stats.crees > 0) {
+            if (confirm(`📱 ${stats.crees} nouveaux codes ont été générés. Voulez-vous les envoyer par WhatsApp aux livreurs concernés ?`)) {
+                const repairedSnap = await db.collection('users')
+                    .where('role', '==', 'livreur')
+                    .where('dateCreation', '>=', new Date(Date.now() - 60000))
+                    .get();
+                let count = 0;
+                for (const doc of repairedSnap.docs) {
+                    const data = doc.data();
+                    if (data.telephone && data.code_secret) {
+                        const phone = data.telephone.replace('+', '');
+                        const messageWA = `Bonjour ${data.nom},\n\nVotre compte livreur HDIX a été activé.\n🔑 Code : ${data.code_secret}\n\nLien : https://hdix.vercel.app`;
+                        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(messageWA)}`, '_blank');
+                        count++;
+                        await new Promise(r => setTimeout(r, 500));
+                    }
+                }
+                showToast(`✅ ${count} messages WhatsApp ouverts !`, 'success');
+            }
+        }
+
+    } catch (error) {
+        console.error('Erreur réparation livreurs:', error);
+        hideSpinner();
+        playSound('error');
+        showToast('❌ Erreur lors de la réparation des livreurs.', 'error');
+    }
 }
 
-// ========== INSCRIPTIONS ==========
+// ========== INSCRIPTIONS AVEC MODALE POUR LIVREUR ==========
+let acceptationEnCours = null;
+
 async function loadInscriptions() {
     try {
         const container = document.getElementById('inscriptionsList');
@@ -1086,11 +1231,15 @@ async function loadInscriptions() {
             const statutLabel = statut === 'acceptée' ? '✅ Acceptée' : statut === 'refusée' ? '❌ Refusée' : '⏳ En attente';
             const code = statut === 'acceptée' && data.codeSecret ? data.codeSecret : '';
             const telephone = data.telephone || '';
+            
+            // Déterminer le rôle avec icône
+            let roleLabel = data.role === 'livreur' ? '🚚 Livreur' : data.role === 'vendeur' ? '🏪 Vendeur' : '👤 Agent';
+            
             html += `
                 <div class="commande-item inscription-item" data-statut="${statut}">
                     <span class="numero">${data.nom || 'Inconnu'}</span>
                     <span class="vendeur">📞 ${telephone}</span>
-                    <span class="localisation">${data.role || 'N/A'}</span>
+                    <span class="localisation">${roleLabel}</span>
                     ${code ? `
                         <span class="montant" style="color:#8e44ad;font-weight:700;">🔑 ${code}</span>
                         <span class="actions" style="display:flex;gap:4px;flex-shrink:0;">
@@ -1101,7 +1250,11 @@ async function loadInscriptions() {
                     <span class="statut ${statutClass}">${statutLabel}</span>
                     <span class="actions">
                         ${statut === 'en_attente' ? `
-                            <button onclick="accepterInscription('${doc.id}')" class="btn-success" style="padding:4px 8px;border:none;border-radius:4px;color:white;cursor:pointer;font-size:12px;">✅</button>
+                            ${data.role === 'livreur' ? `
+                                <button onclick="ouvrirModalAccepterLivreur('${doc.id}')" class="btn-success" style="padding:4px 8px;border:none;border-radius:4px;color:white;cursor:pointer;font-size:12px;background:#27ae60;">✅</button>
+                            ` : `
+                                <button onclick="accepterInscriptionSimple('${doc.id}')" class="btn-success" style="padding:4px 8px;border:none;border-radius:4px;color:white;cursor:pointer;font-size:12px;background:#27ae60;">✅</button>
+                            `}
                             <button onclick="refuserInscription('${doc.id}')" class="btn-danger" style="padding:4px 8px;border:none;border-radius:4px;color:white;cursor:pointer;font-size:12px;">❌</button>
                         ` : `
                             <span style="color:#6b7a8f;font-size:11px;">✓</span>
@@ -1154,43 +1307,210 @@ function filtrerInscriptions(statut) {
     });
 }
 
-async function accepterInscription(id) {
+// ========== OUVERTURE MODALE ACCEPTATION LIVREUR ==========
+async function ouvrirModalAccepterLivreur(id) {
     playSound('click');
-    if (!confirm('Accepter cette demande ?')) return;
     try {
         const doc = await db.collection('inscriptions').doc(id).get();
         const data = doc.data();
+        
+        if (!data) { showToast('❌ Demande introuvable', 'error'); return; }
+        
+        // Remplir la modale
+        document.getElementById('modalNom').textContent = data.nom || 'Inconnu';
+        document.getElementById('modalTelephone').textContent = data.telephone || 'Non fourni';
+        document.getElementById('modalBoutique').textContent = data.boutique || 'Aucune';
+        
+        // Réinitialiser les champs
+        document.getElementById('modalTypeContrat').value = 'externe_partage';
+        document.getElementById('modalZone').value = 'Libreville';
+        document.getElementById('modalCapacite').value = 10;
+        
+        // Stocker l'ID pour validation
+        acceptationEnCours = id;
+        
+        // Afficher la modale
+        document.getElementById('modalAccepterLivreur').classList.add('active');
+    } catch (error) {
+        console.error('Erreur:', error);
+        showToast('❌ Erreur lors du chargement', 'error');
+    }
+}
+
+function fermerModalAccepter() {
+    document.getElementById('modalAccepterLivreur').classList.remove('active');
+    acceptationEnCours = null;
+}
+
+async function validerAcceptationLivreur() {
+    if (!acceptationEnCours) {
+        showToast('⚠️ Aucune demande en cours', 'error');
+        return;
+    }
+    
+    const id = acceptationEnCours;
+    const typeContrat = document.getElementById('modalTypeContrat').value;
+    const zone = document.getElementById('modalZone').value;
+    const capacite = parseInt(document.getElementById('modalCapacite').value) || 10;
+    
+    let type = 'externe';
+    let contrat = 'partage';
+    if (typeContrat === 'interne') {
+        type = 'interne';
+        contrat = 'salarie';
+    } else if (typeContrat === 'externe_garde_tout') {
+        type = 'externe';
+        contrat = 'garde_tout';
+    }
+    
+    await accepterInscriptionLivreur(id, type, contrat, zone, capacite);
+    fermerModalAccepter();
+}
+
+async function accepterInscriptionLivreur(id, type, contrat, zone, capacite) {
+    showSpinner();
+    try {
+        const doc = await db.collection('inscriptions').doc(id).get();
+        const data = doc.data();
+        
+        if (!data) { showToast('❌ Demande introuvable', 'error'); hideSpinner(); return; }
+        
+        // Générer un code unique
         const code = await generateUniqueCode();
-        const vendeurRef = await db.collection('vendeurs').add({
+        
+        // Créer le livreur
+        const tauxPartAgent = {
+            'Libreville': 500,
+            'Nzeng-Ayong': 500,
+            'Akanda': 1000,
+            'Owendo': 1000,
+            'zones_difficiles': 1000,
+            'autres': 1000
+        };
+        
+        const livreurRef = await db.collection('livreurs').add({
             nom: data.nom,
             telephone: data.telephone,
-            abreviation: data.abreviation || 'VEN' + Math.floor(Math.random() * 1000),
+            zone: zone,
+            capacite: capacite,
+            actif: true,
+            type: type,
+            contrat: contrat,
+            taux_part_agent: tauxPartAgent,
+            gains: {
+                total_collecte: 0,
+                part_livreur: 0,
+                part_agent: 0
+            },
             dateCreation: new Date()
         });
+        
+        // Créer l'utilisateur
         await db.collection('users').add({
             nom: data.nom,
-            role: data.role || 'vendeur',
+            role: 'livreur',
             code_secret: code,
             telephone: data.telephone,
-            vendeurId: vendeurRef.id,
+            livreurId: livreurRef.id,
             boutique: data.boutique || '',
             dateCreation: new Date()
         });
+        
+        // Marquer l'inscription comme acceptée
         await db.collection('inscriptions').doc(id).update({
             statut: 'acceptée',
             dateTraitement: new Date(),
             codeSecret: code,
-            vendeurId: vendeurRef.id
+            livreurId: livreurRef.id
         });
+        
+        // Message de confirmation
+        let typeLabel = '';
+        if (type === 'interne') typeLabel = '🔒 Interne (salarié)';
+        else if (contrat === 'garde_tout') typeLabel = '💰 Externe - Garde tout';
+        else typeLabel = '📊 Externe - Partage';
+        
         playSound('success');
-        showToast(`✅ Inscription acceptée ! Code: ${code}`, 'success');
+        showToast(`✅ Livreur accepté !\n📋 ${data.nom} - ${typeLabel}\n🔑 Code: ${code}`, 'success');
+        
+        // Envoyer le code par WhatsApp
+        if (data.telephone) {
+            const phone = data.telephone.replace(/[^0-9+]/g, '');
+            const message = `Bonjour ${data.nom},\n\nVotre compte livreur HDIX a été activé.\n🔑 Code : ${code}\n📋 Type : ${typeLabel}\n📍 Zone : ${zone}\n📦 Capacité : ${capacite} colis\n\nLien : https://hdix.vercel.app`;
+            if (confirm(`📱 Envoyer le code par WhatsApp à ${data.nom} ?`)) {
+                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+            }
+        }
+        
+        // Recharger les listes
         loadInscriptions();
-        loadVendeurs();
+        loadLivreurs();
         loadKPI();
+        
     } catch (error) {
-        console.error('Erreur acceptation:', error);
+        console.error('Erreur acceptation livreur:', error);
+        showToast('❌ Erreur lors de l\'acceptation.', 'error');
+    }
+    hideSpinner();
+}
+
+// ========== ACCEPTATION SIMPLE (Vendeurs/Agents) ==========
+async function accepterInscriptionSimple(id) {
+    showSpinner();
+    try {
+        const doc = await db.collection('inscriptions').doc(id).get();
+        const data = doc.data();
+        const code = await generateUniqueCode();
+        
+        if (data.role === 'vendeur') {
+            const vendeurRef = await db.collection('vendeurs').add({
+                nom: data.nom,
+                telephone: data.telephone,
+                abreviation: data.abreviation || 'VEN' + Math.floor(Math.random() * 1000),
+                dateCreation: new Date()
+            });
+            await db.collection('users').add({
+                nom: data.nom,
+                role: 'vendeur',
+                code_secret: code,
+                telephone: data.telephone,
+                vendeurId: vendeurRef.id,
+                boutique: data.boutique || '',
+                dateCreation: new Date()
+            });
+            await db.collection('inscriptions').doc(id).update({
+                statut: 'acceptée',
+                dateTraitement: new Date(),
+                codeSecret: code,
+                vendeurId: vendeurRef.id
+            });
+            showToast(`✅ Vendeur accepté ! Code: ${code}`, 'success');
+            loadInscriptions();
+            loadVendeurs();
+            loadKPI();
+        } else if (data.role === 'agent') {
+            await db.collection('users').add({
+                nom: data.nom,
+                role: 'agent',
+                code_secret: code,
+                telephone: data.telephone,
+                dateCreation: new Date()
+            });
+            await db.collection('inscriptions').doc(id).update({
+                statut: 'acceptée',
+                dateTraitement: new Date(),
+                codeSecret: code
+            });
+            showToast(`✅ Agent accepté ! Code: ${code}`, 'success');
+            loadInscriptions();
+            loadAgents();
+            loadKPI();
+        }
+    } catch (error) {
+        console.error('Erreur acceptation simple:', error);
         showToast('❌ Erreur acceptation.', 'error');
     }
+    hideSpinner();
 }
 
 async function refuserInscription(id) {
@@ -1307,54 +1627,96 @@ async function envoyerBilanWhatsApp() {
     } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
-async function generateMonthlyReport() {
-    playSound('click');
-    showToast('📊 Rapport mensuel bientôt disponible.', 'info');
+// ========== STOCKAGE ==========
+async function loadStockage() {
+    try {
+        const vendeurs = await db.collection('vendeurs').get();
+        const container = document.getElementById('stockageList');
+        const resume = document.getElementById('stockageResume');
+        const dettes = document.getElementById('stockageDettes');
+        if (vendeurs.empty) { container.innerHTML = '<p class="empty-message">Aucun vendeur.</p>'; return; }
+        let html = '<div class="list-container">', totalCasiers=0, totalDettes=0;
+        for (const doc of vendeurs.docs) {
+            const data = doc.data();
+            const s = await db.collection('stockage').where('vendeurId','==',doc.id).where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
+            let casiers=0, dette=0;
+            if (!s.empty) { const d=s.docs[0].data(); casiers=d.casiers||0; dette=d.dette||0; }
+            totalCasiers += casiers; totalDettes += dette;
+            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>Casiers: ${casiers} | Dette: ${formatNumber(dette)} FCFA</small></div>
+                <div><button onclick="ajouterCasier('${doc.id}')" class="btn-edit">+</button>
+                <button onclick="retirerCasier('${doc.id}')" class="btn-delete">-</button></div></div>`;
+        }
+        html += '</div>'; container.innerHTML = html;
+        resume.innerHTML = `<div style="font-size:18px;font-weight:700;">${totalCasiers}</div><div style="color:#6b7a8f;">casiers</div>`;
+        dettes.innerHTML = `<div style="font-size:18px;font-weight:700;color:${totalDettes>0?'#c0392b':'#2d7d46'};">${formatNumber(totalDettes)} FCFA</div><div style="color:#6b7a8f;">dette</div>`;
+    } catch(e) { console.error(e); }
 }
 
-// ========== TOURNÉES ==========
-async function optimiserTournees() {
-    playSound('click');
-    showSpinner();
+async function ajouterCasier(vendeurId) {
+    const n = parseInt(prompt('Nombre de casiers à ajouter :')||'1');
+    if (isNaN(n)||n<=0) return;
     try {
-        const snapshot = await db.collection('commandes').where('statut','in',['En-cours','À appeler']).get();
-        const container = document.getElementById('tourneesContainer');
-        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune commande en cours.</p>'; hideSpinner(); return; }
-        const zones = ['Libreville','Akanda','Owendo','Bikélé'];
-        const cmds = []; snapshot.forEach(d => cmds.push({ id: d.id, ...d.data() }));
-        cmds.sort((a,b) => (zones.indexOf(a.zone)=== -1?999:zones.indexOf(a.zone)) - (zones.indexOf(b.zone)===-1?999:zones.indexOf(b.zone)));
-        let html = `<div class="bilan-result"><h4>🗺️ Itinéraire optimisé</h4><p style="color:#6b7a8f;">${cmds.length} commandes</p><div style="margin-top:12px;">`;
-        cmds.forEach((c,i) => { html += `<div class="recap-item"><span>${i+1}. ${c.numero}</span><span>${c.zone||'N/A'}</span><span style="font-size:12px;color:#6b7a8f;">${c.quartier}</span></div>`; });
-        html += '</div></div>';
-        container.innerHTML = html;
-        showToast('✅ Tournées optimisées !', 'success');
-    } catch(e) { showToast('❌ Erreur optimisation.', 'error'); }
-    hideSpinner();
+        const s = await db.collection('stockage').where('vendeurId','==',vendeurId).where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
+        if (s.empty) {
+            await db.collection('stockage').add({ vendeurId, casiers: n, dette: n*5000, mois: new Date().getMonth()+1, annee: new Date().getFullYear() });
+        } else {
+            const doc = s.docs[0]; const data=doc.data();
+            const newCasiers=(data.casiers||0)+n;
+            await db.collection('stockage').doc(doc.id).update({ casiers: newCasiers, dette: newCasiers*5000 });
+        }
+        playSound('success');
+        showToast(`✅ ${n} casier(s) ajouté(s)`, 'success');
+        loadStockage();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
-async function attributionAuto() {
-    playSound('click');
-    showSpinner();
+async function retirerCasier(vendeurId) {
     try {
-        const livreurs = await db.collection('livreurs').where('actif','==',true).get();
-        if (livreurs.empty) { showToast('⚠️ Aucun livreur actif.', 'error'); hideSpinner(); return; }
-        const list = []; livreurs.forEach(d => list.push({ id: d.id, ...d.data(), charge:0 }));
-        const cmds = await db.collection('commandes').where('statut','==','À appeler').get();
-        if (cmds.empty) { showToast('⚠️ Aucune commande à attribuer.', 'error'); hideSpinner(); return; }
-        let attribuees=0;
-        for (const doc of cmds.docs) {
-            list.sort((a,b) => a.charge - b.charge);
-            const l = list[0];
-            if (l && l.charge < (l.capacite||15)) {
-                await db.collection('commandes').doc(doc.id).update({ livreurId: l.id, livreurNom: l.nom, statut: 'En-cours', dateAssignation: new Date() });
-                l.charge++; attribuees++;
+        const s = await db.collection('stockage').where('vendeurId','==',vendeurId).where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
+        if (s.empty) { showToast('⚠️ Aucun casier.', 'error'); return; }
+        const doc=s.docs[0]; const data=doc.data();
+        const actuel=data.casiers||0;
+        if (actuel<=0) { showToast('⚠️ Aucun casier.', 'error'); return; }
+        const n=parseInt(prompt(`Casiers actuels: ${actuel}. Combien retirer ?`)||'1');
+        if (isNaN(n)||n<=0) return;
+        const nouveau=Math.max(0, actuel-n);
+        await db.collection('stockage').doc(doc.id).update({ casiers: nouveau, dette: nouveau*5000 });
+        playSound('success');
+        showToast(`✅ ${n} casier(s) retiré(s)`, 'success');
+        loadStockage();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
+}
+
+async function activerPrelevements() {
+    playSound('click');
+    if (!confirm('Activer les prélèvements pour tous les vendeurs ?')) return;
+    try {
+        const s = await db.collection('stockage').where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
+        let count=0;
+        for(const doc of s.docs) { await db.collection('stockage').doc(doc.id).update({ prelevementsActifs: true, dateActivation: new Date() }); count++; }
+        playSound('success');
+        showToast(`✅ Prélèvements activés pour ${count} vendeur(s)`, 'success');
+        loadStockage();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
+}
+
+async function appliquerPenalites() {
+    playSound('click');
+    if (!confirm('Appliquer les pénalités de 2.500 FCFA/jour ?')) return;
+    try {
+        const s = await db.collection('stockage').where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
+        let count=0;
+        for(const doc of s.docs) {
+            const data=doc.data();
+            if(data.dette>0) {
+                await db.collection('stockage').doc(doc.id).update({ dette: (data.dette||0)+2500, penalites: (data.penalites||0)+2500, dernierJourRetard: new Date() });
+                count++;
             }
         }
         playSound('success');
-        showToast(`✅ ${attribuees} commandes attribuées !`, 'success');
-        loadCommandes(); loadAppels(); optimiserTournees(); loadKPI();
-    } catch(e) { showToast('❌ Erreur attribution.', 'error'); }
-    hideSpinner();
+        showToast(`✅ Pénalités appliquées à ${count} vendeur(s)`, 'success');
+        loadStockage();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
 // ========== STOCK ==========
@@ -1464,40 +1826,135 @@ async function retirerStock(id) {
 // ========== TRÉSORERIE ==========
 async function loadTresorerie() {
     try {
+        // Solde
         const soldeSnap = await db.collection('tresorerie').orderBy('date', 'desc').limit(1).get();
         let solde = 0;
         if (!soldeSnap.empty) { solde = soldeSnap.docs[0].data().solde || 0; }
         document.getElementById('soldeDisplay').textContent = formatNumber(solde) + ' FCFA';
 
+        // Airtel
         const configSnap = await db.collection('tresorerie_config').doc('config').get();
         if (configSnap.exists) {
             document.getElementById('airtelDisplay').textContent = configSnap.data().airtel_numero || '+241 66 12 34 56';
         }
 
-        const snapshot = await db.collection('tresorerie').orderBy('date', 'desc').get();
+        // Transactions
+        const snapshot = await db.collection('tresorerie').orderBy('date', 'desc').limit(50).get();
         const container = document.getElementById('transactionsContainer');
-        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune transaction.</p>'; return; }
-        let html = '';
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const type = data.type || 'depot';
-            const typeClass = type === 'depot' ? 'type-depot' : type === 'retrait' ? 'type-retrait' : 'type-airtel';
-            const typeLabel = type === 'depot' ? '📥 Dépôt' : type === 'retrait' ? '📤 Retrait' : '📱 Airtel';
-            const montantClass = type === 'depot' ? 'montant-depot' : 'montant-retrait';
-            const signe = type === 'depot' ? '+' : '-';
-            const date = data.date ? new Date(data.date.seconds * 1000) : new Date();
-            html += `<div class="transaction-item">
-                <div>
-                    <span class="type ${typeClass}">${typeLabel}</span>
-                    <span style="font-size:13px;color:#6b7a8f;margin-left:8px;">${date.toLocaleDateString()}</span>
-                    ${data.description ? `<br><small style="color:#6b7a8f;">${data.description}</small>` : ''}
-                    ${data.mode && data.mode !== 'especes' ? `<br><small style="color:#6b7a8f;">${data.mode.replace('_', ' ').toUpperCase()}</small>` : ''}
-                </div>
-                <div class="${montantClass}">${signe} ${formatNumber(data.montant)} FCFA</div>
-            </div>`;
-        });
-        container.innerHTML = html;
+        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune transaction.</p>'; } else {
+            let html = '';
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const type = data.type || 'depot';
+                const typeClass = type === 'depot' ? 'type-depot' : type === 'retrait' ? 'type-retrait' : 'type-airtel';
+                const typeLabel = type === 'depot' ? '📥 Dépôt' : type === 'retrait' ? '📤 Retrait' : '🚚 Livraison';
+                const montantClass = type === 'depot' ? 'montant-depot' : 'montant-retrait';
+                const signe = type === 'depot' ? '+' : '-';
+                const date = data.date ? new Date(data.date.seconds * 1000) : new Date();
+                html += `<div class="transaction-item">
+                    <div>
+                        <span class="type ${typeClass}">${typeLabel}</span>
+                        <span style="font-size:13px;color:#6b7a8f;margin-left:8px;">${date.toLocaleDateString()}</span>
+                        ${data.description ? `<br><small style="color:#6b7a8f;">${data.description}</small>` : ''}
+                        ${data.livreurNom ? `<br><small style="color:#8e44ad;">🚚 ${data.livreurNom}</small>` : ''}
+                        ${data.mode && data.mode !== 'especes' ? `<br><small style="color:#6b7a8f;">${data.mode.replace('_', ' ').toUpperCase()}</small>` : ''}
+                    </div>
+                    <div class="${montantClass}">${signe} ${formatNumber(data.montant)} FCFA</div>
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+        
+        // ========== GAINS DES LIVREURS ==========
+        await loadGainsLivreurs();
+        
     } catch(e) { console.error('Erreur trésorerie:', e); }
+}
+
+// ========== GAINS DES LIVREURS ==========
+async function loadGainsLivreurs() {
+    try {
+        const container = document.getElementById('gainsLivreursContainer');
+        const snapshot = await db.collection('livreurs').orderBy('nom').get();
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<p class="empty-message">Aucun livreur.</p>';
+            return;
+        }
+        
+        let html = `<div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead>
+                    <tr style="background:#f8f9fa;border-bottom:2px solid #e2e8f0;">
+                        <th style="padding:8px 10px;text-align:left;">Livreur</th>
+                        <th style="padding:8px 10px;text-align:center;">Type</th>
+                        <th style="padding:8px 10px;text-align:right;">Total collecté</th>
+                        <th style="padding:8px 10px;text-align:right;">Part livreur</th>
+                        <th style="padding:8px 10px;text-align:right;">Part agent</th>
+                        <th style="padding:8px 10px;text-align:center;">Taux livreur</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+        
+        let totalCollecteGlobal = 0;
+        let totalPartLivreurGlobal = 0;
+        let totalPartAgentGlobal = 0;
+        
+        for (const doc of snapshot.docs) {
+            const data = doc.data();
+            const gains = data.gains || {};
+            const totalCollecte = gains.total_collecte || 0;
+            const partLivreur = gains.part_livreur || 0;
+            const partAgent = gains.part_agent || 0;
+            
+            totalCollecteGlobal += totalCollecte;
+            totalPartLivreurGlobal += partLivreur;
+            totalPartAgentGlobal += partAgent;
+            
+            let typeLabel = '';
+            let tauxLivreur = '0%';
+            if (data.type === 'interne') {
+                typeLabel = '🔒 Interne';
+                tauxLivreur = '0%';
+            } else if (data.contrat === 'garde_tout') {
+                typeLabel = '💰 Garde tout';
+                tauxLivreur = '100%';
+            } else {
+                typeLabel = '📊 Partage';
+                tauxLivreur = totalCollecte > 0 ? Math.round((partLivreur / totalCollecte) * 100) + '%' : '0%';
+            }
+            
+            html += `<tr style="border-bottom:1px solid #eee;">
+                <td style="padding:8px 10px;"><strong>${data.nom}</strong></td>
+                <td style="padding:8px 10px;text-align:center;">${typeLabel}</td>
+                <td style="padding:8px 10px;text-align:right;">${formatNumber(totalCollecte)} FCFA</td>
+                <td style="padding:8px 10px;text-align:right;color:#27ae60;font-weight:600;">${formatNumber(partLivreur)} FCFA</td>
+                <td style="padding:8px 10px;text-align:right;color:#2980b9;">${formatNumber(partAgent)} FCFA</td>
+                <td style="padding:8px 10px;text-align:center;font-weight:600;">${tauxLivreur}</td>
+            </tr>`;
+        }
+        
+        // Total général
+        html += `
+                </tbody>
+                <tfoot>
+                    <tr style="background:#f8f9fa;font-weight:700;border-top:2px solid #2c3e50;">
+                        <td style="padding:10px;">📊 TOTAL</td>
+                        <td style="text-align:center;">-</td>
+                        <td style="text-align:right;">${formatNumber(totalCollecteGlobal)} FCFA</td>
+                        <td style="text-align:right;color:#27ae60;">${formatNumber(totalPartLivreurGlobal)} FCFA</td>
+                        <td style="text-align:right;color:#2980b9;">${formatNumber(totalPartAgentGlobal)} FCFA</td>
+                        <td style="text-align:center;">${totalCollecteGlobal > 0 ? Math.round((totalPartLivreurGlobal / totalCollecteGlobal) * 100) + '%' : '0%'}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>`;
+        
+        container.innerHTML = html;
+    } catch(e) {
+        console.error('Erreur gains livreurs:', e);
+        document.getElementById('gainsLivreursContainer').innerHTML = '<p class="empty-message">❌ Erreur chargement des gains.</p>';
+    }
 }
 
 function filtrerTransactions(type) {

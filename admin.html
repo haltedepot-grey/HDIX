@@ -90,6 +90,23 @@
             flex-shrink: 0;
         }
 
+        /* Bouton réparer livreurs */
+        .btn-repair {
+            background: #8e44ad;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            transition: background 0.2s;
+        }
+        .btn-repair:hover {
+            background: #7d3c98;
+        }
+
         @media (max-width: 600px) {
             .admin-grid {
                 grid-template-columns: 1fr;
@@ -173,6 +190,12 @@
     <!-- ========== SECTION ADMINISTRATION ========== -->
     <div id="section-administration" class="section">
         <h3>⚙️ Administration</h3>
+        
+        <!-- 🔧 Bouton Réparer les livreurs -->
+        <div style="margin-bottom:16px;">
+            <button onclick="reparerLivreurs()" class="btn-repair">🔧 Réparer les livreurs (migration)</button>
+        </div>
+        
         <div class="admin-grid">
             <!-- Vendeurs -->
             <div class="admin-card">
@@ -261,6 +284,13 @@
                 <button onclick="openRetraitModal()" class="btn-primary" style="flex:1;background:#c0392b;">📤 Retrait</button>
                 <button onclick="exporterTransactions()" class="btn-primary" style="flex:1;background:#8e44ad;">📊 Export</button>
             </div>
+            
+            <!-- Gains des livreurs -->
+            <div style="margin:16px 0;background:white;border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+                <h4 style="margin-bottom:12px;">🚚 Gains des livreurs</h4>
+                <div id="gainsLivreursContainer"><p class="empty-message">Chargement...</p></div>
+            </div>
+            
             <div id="transactionsContainer"><div class="spinner" style="margin:20px auto;"></div></div>
         </div>
     </div>
@@ -358,6 +388,53 @@
         <div class="form-group"><label>Mode de retrait</label><select id="retraitMode"><option value="especes">Espèces</option><option value="airtel_money">Airtel Money</option><option value="virement">Virement</option></select></div>
         <div class="form-group"><label>Description</label><input type="text" id="retraitDescription" placeholder="Ex: Retrait pour livreur" /></div>
         <button onclick="enregistrerRetrait()" class="btn-primary btn-danger">📤 Retirer</button>
+    </div>
+</div>
+
+<!-- ============================================================
+MODALE POUR ACCEPTER UN LIVREUR (AVEC CHOIX DU CONTRAT)
+============================================================ -->
+<div class="modal" id="modalAccepterLivreur">
+    <div class="modal-content" style="max-width:500px;">
+        <button class="modal-close" onclick="fermerModalAccepter()">✕</button>
+        <div class="step-title">✅ Accepter un livreur</div>
+        
+        <div id="modalLivreurInfo" style="background:#f8f9fa;padding:12px 16px;border-radius:8px;margin-bottom:16px;">
+            <p style="margin:4px 0;"><strong>👤 Nom :</strong> <span id="modalNom"></span></p>
+            <p style="margin:4px 0;"><strong>📱 Téléphone :</strong> <span id="modalTelephone"></span></p>
+            <p style="margin:4px 0;"><strong>🏪 Boutique :</strong> <span id="modalBoutique"></span></p>
+        </div>
+
+        <div class="form-group">
+            <label>📋 Type de contrat :</label>
+            <select id="modalTypeContrat" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;">
+                <option value="interne">🔒 Interne (salarié) - L'entreprise garde tout</option>
+                <option value="externe_partage" selected>📊 Externe - Partage (fixe + livreur)</option>
+                <option value="externe_garde_tout">💰 Externe - Garde tout (tout pour le livreur)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>📍 Zone de livraison attribuée :</label>
+            <select id="modalZone" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;">
+                <option value="Libreville">Libreville</option>
+                <option value="Akanda">Akanda</option>
+                <option value="Owendo">Owendo</option>
+                <option value="Nzeng-Ayong">Nzeng-Ayong</option>
+                <option value="zones_difficiles">Zones difficiles</option>
+                <option value="autres">Autres</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>📦 Capacité (nombre max de colis) :</label>
+            <input type="number" id="modalCapacite" value="10" min="1" style="width:100%;padding:10px;border:2px solid #e2e8f0;border-radius:8px;font-size:14px;" />
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:16px;">
+            <button onclick="validerAcceptationLivreur()" class="btn-success" style="flex:1;padding:12px;border:none;border-radius:8px;font-size:16px;cursor:pointer;background:#27ae60;color:white;font-weight:600;">✅ VALIDER</button>
+            <button onclick="fermerModalAccepter()" class="btn-danger" style="flex:0.4;padding:12px;border:none;border-radius:8px;font-size:16px;cursor:pointer;background:#e74c3c;color:white;font-weight:600;">✖</button>
+        </div>
     </div>
 </div>
 
