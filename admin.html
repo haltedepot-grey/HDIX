@@ -80,6 +80,16 @@
             padding-bottom: 8px;
         }
 
+        /* Cases à cocher dans les commandes */
+        .commande-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin-right: 8px;
+            cursor: pointer;
+            accent-color: #1a2b4c;
+            flex-shrink: 0;
+        }
+
         @media (max-width: 600px) {
             .admin-grid {
                 grid-template-columns: 1fr;
@@ -122,21 +132,30 @@
             <h3>📋 Commandes</h3>
             <button onclick="loadCommandes()" class="refresh-btn">🔄</button>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 16px 0;gap:12px;flex-wrap:wrap;">
-            <button onclick="openCommandeModal()" class="btn-create" style="flex:1;min-width:200px;">✨ Nouvelle commande</button>
+
+        <!-- Actions groupées -->
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;">
+            <button onclick="openCommandeModal()" class="btn-create" style="flex:1;min-width:150px;">✨ Nouvelle commande</button>
+            <button onclick="assignerSelection()" class="btn-primary" style="flex:1;min-width:150px;background:#8e44ad;">🚚 Assigner sélection</button>
+            <button onclick="toggleSelectionMode()" class="btn-secondary" style="flex:1;min-width:150px;">☑️ Sélectionner</button>
         </div>
+
         <div class="filter-buttons">
             <button onclick="filtrerCommandes('all')" class="filter-btn active" data-filter="all">📋 Toutes</button>
             <button onclick="filtrerCommandes('À appeler')" class="filter-btn" data-filter="À appeler" style="background:#fef9e7;">📞 À appeler</button>
             <button onclick="filtrerCommandes('En-cours')" class="filter-btn" data-filter="En-cours" style="background:#ebf5fb;">🔄 En-cours</button>
             <button onclick="filtrerCommandes('Livrée')" class="filter-btn" data-filter="Livrée" style="background:#eafaf1;">✅ Livrée</button>
         </div>
+
         <div class="stats-grid">
             <div class="stat-card"><span class="stat-number" id="statAppeler">0</span><span class="stat-label">À appeler</span></div>
             <div class="stat-card"><span class="stat-number" id="statLivree">0</span><span class="stat-label">Livrées</span></div>
             <div class="stat-card"><span class="stat-number" id="statTotal">0</span><span class="stat-label">Total</span></div>
         </div>
-        <div class="commandes-list"><div id="commandesContainer"><div class="spinner" style="margin:30px auto;"></div></div></div>
+
+        <div class="commandes-list">
+            <div id="commandesContainer"><div class="spinner" style="margin:30px auto;"></div></div>
+        </div>
     </div>
 
     <!-- ========== SECTION STOCKS ========== -->
