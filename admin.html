@@ -178,18 +178,18 @@
             <button class="nav-btn" onclick="showSection('stocks')">📦 Stocks</button>
         </div>
 
-        <!-- ONGLET 3 : Administration (4 sous-sections) -->
-        <div class="nav-item">
-            <button class="nav-btn" onclick="toggleDropdown('administration')">
-                ⚙️ Administration <span class="arrow" id="arrow-administration">▼</span>
-            </button>
-            <div class="dropdown-menu" id="dropdown-administration">
-                <button class="dropdown-item active" onclick="selectSubSection('administration', 'admin-vendeurs', this)">👤 Vendeurs</button>
-                <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-agents', this)">👨‍💼 Agents</button>
-                <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-livreurs', this)">🚚 Livreurs</button>
-                <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-inscriptions', this)">📝 Inscriptions</button>
-            </div>
-        </div>
+        <!-- ONGLET 3 : Administration -->
+<div class="nav-item">
+    <button class="nav-btn" onclick="toggleDropdown('administration')">
+        ⚙️ Administration <span class="arrow" id="arrow-administration">▼</span>
+    </button>
+    <div class="dropdown-menu" id="dropdown-administration">
+        <button class="dropdown-item active" onclick="selectSubSection('administration', 'admin-vendeurs', this)">👤 Vendeurs</button>
+        <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-agents', this)">👨‍💼 Agents</button>
+        <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-livreurs', this)">🚚 Livreurs</button>
+        <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-inscriptions', this)">📝 Inscriptions</button>
+    </div>
+</div>
 
         <!-- ONGLET 4 : Bilan -->
         <div class="nav-item">

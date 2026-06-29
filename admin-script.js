@@ -1,4 +1,4 @@
-// admin-script.js - Version complète
+// admin-script.js - Version complète avec navigation corrigée
 
 // ========== SONS ==========
 let clickSound = null, successSound = null, errorSound = null;
@@ -38,89 +38,94 @@ function hideSpinner() { document.getElementById('globalSpinner').classList.remo
 // ========== NAVIGATION ==========
 function showSection(section) {
     playSound('click');
+    
+    // Cacher toutes les sections
     document.querySelectorAll('.section').forEach(el => el.style.display = 'none');
-    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-    document.getElementById(`section-${section}`).style.display = 'block';
-    document.querySelector(`.nav-btn[onclick="showSection('${section}')"]`).classList.add('active');
-
-    // Charger les données selon la section
-    if (section === 'vendeurs' || section === 'administration') {
-        loadVendeurs();
-        loadLivreurs();
-        loadInscriptions();
-    }
-    if (section === 'commandes') {
-        loadCommandes();
-        loadAppels();
-        optimiserTournees();
-    }
-    if (section === 'stocks') {
-        loadStockage();
-    }
-    if (section === 'bilan') {
-        loadKPI();
-        loadVendeursForBilan();
-        loadTresorerie();
-    }
+    
+    // Afficher la section demandée
+    const target = document.getElementById(`section-${section}`);
+    if (target) target.style.display = 'block';
+    
+    // Fermer tous les dropdowns
+    document.querySelectorAll('.dropdown-menu').forEach(el => el.classList.remove('open'));
+    document.querySelectorAll('.arrow').forEach(el => el.classList.remove('open'));
+    
+    // Charger les données
+    if (section === 'commandes') { loadCommandes(); loadAppels(); }
+    if (section === 'stocks') loadStockage();
+    if (section === 'administration') { loadVendeurs(); loadAgents(); loadLivreurs(); loadInscriptions(); }
+    if (section === 'bilan') { loadKPI(); loadVendeursForBilan(); loadTresorerie(); }
 }
 
 function logout() { playSound('click'); sessionStorage.removeItem('user'); window.location.href = 'index.html'; }
 
-// ========== GESTION DES DROPDOWNS ==========
+// ========== GESTION DES DROPDOWNS ACCORDÉON ==========
 
-// Dropdown Commandes
-function changeCommandeSection(value) {
-    document.querySelectorAll('#section-commandes .sub-section').forEach(el => {
-        el.style.display = 'none';
-        el.classList.remove('active');
+function toggleDropdown(section) {
+    const dropdown = document.getElementById(`dropdown-${section}`);
+    const arrow = document.getElementById(`arrow-${section}`);
+    
+    if (!dropdown) return;
+    
+    // Fermer tous les autres dropdowns
+    document.querySelectorAll('.dropdown-menu').forEach(el => {
+        if (el.id !== `dropdown-${section}`) {
+            el.classList.remove('open');
+            const arrowId = el.id.replace('dropdown-', 'arrow-');
+            const otherArrow = document.getElementById(arrowId);
+            if (otherArrow) otherArrow.classList.remove('open');
+        }
     });
-    const target = document.getElementById(`sub-${value}`);
-    if (target) {
-        target.style.display = 'block';
-        target.classList.add('active');
-    }
-    document.getElementById('commandesDropdown').value = value;
-
-    // Charger les données selon la sous-section
-    if (value === 'commandes-liste') loadCommandes();
-    if (value === 'commandes-appels') loadAppels();
-    if (value === 'commandes-tournees') optimiserTournees();
+    
+    // Basculer celui-ci
+    dropdown.classList.toggle('open');
+    if (arrow) arrow.classList.toggle('open');
 }
 
-// Dropdown Administration
-function changeAdminSection(value) {
-    document.querySelectorAll('#section-administration .sub-section').forEach(el => {
-        el.style.display = 'none';
-        el.classList.remove('active');
-    });
-    const target = document.getElementById(`sub-${value}`);
-    if (target) {
-        target.style.display = 'block';
-        target.classList.add('active');
+function selectSubSection(section, subSection, element) {
+    // Mettre à jour le dropdown
+    const dropdown = document.getElementById(`dropdown-${section}`);
+    if (dropdown) {
+        dropdown.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
+        if (element) element.classList.add('active');
     }
-    document.getElementById('adminDropdown').value = value;
-
-    if (value === 'admin-vendeurs') loadVendeurs();
-    if (value === 'admin-livreurs') loadLivreurs();
-    if (value === 'admin-inscriptions') loadInscriptions();
+    
+    // Fermer le dropdown
+    if (dropdown) dropdown.classList.remove('open');
+    const arrow = document.getElementById(`arrow-${section}`);
+    if (arrow) arrow.classList.remove('open');
+    
+    // Cacher toutes les sous-sections de cette section
+    const sectionElement = document.getElementById(`section-${section}`);
+    if (sectionElement) {
+        sectionElement.querySelectorAll('.sub-section').forEach(el => {
+            el.classList.remove('active');
+            el.style.display = 'none';
+        });
+    }
+    
+    // Afficher la sous-section demandée
+    const target = document.getElementById(`sub-${subSection}`);
+    if (target) {
+        target.classList.add('active');
+        target.style.display = 'block';
+    }
+    
+    // Charger les données
+    loadSubSectionData(subSection);
 }
 
-// Dropdown Bilan
-function changeBilanSection(value) {
-    document.querySelectorAll('#section-bilan .sub-section').forEach(el => {
-        el.style.display = 'none';
-        el.classList.remove('active');
-    });
-    const target = document.getElementById(`sub-${value}`);
-    if (target) {
-        target.style.display = 'block';
-        target.classList.add('active');
-    }
-    document.getElementById('bilanDropdown').value = value;
-
-    if (value === 'bilan-kpi') loadKPI();
-    if (value === 'bilan-general') loadVendeursForBilan();
-    if (value === 'bilan-tresorerie') loadTresorerie();
+function loadSubSectionData(subSection) {
+    if (subSection === 'commandes-liste') loadCommandes();
+    else if (subSection === 'commandes-appels') loadAppels();
+    else if (subSection === 'commandes-tournees') optimiserTournees();
+    else if (subSection === 'admin-vendeurs') loadVendeurs();
+    else if (subSection === 'admin-agents') loadAgents();
+    else if (subSection === 'admin-livreurs') loadLivreurs();
+    else if (subSection === 'admin-inscriptions') loadInscriptions();
+    else if (subSection === 'bilan-kpi') loadKPI();
+    else if (subSection === 'bilan-general') loadVendeursForBilan();
+    else if (subSection === 'bilan-tresorerie') loadTresorerie();
 }
 
 // ========== KPI ==========
@@ -780,6 +785,120 @@ async function resetVendeurCode(id) {
     } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
+// ========== AGENTS ==========
+async function loadAgents() {
+    try {
+        const snapshot = await db.collection('users')
+            .where('role', '==', 'agent')
+            .get();
+        
+        const container = document.getElementById('agentsList');
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<p class="empty-message">Aucun agent enregistré.</p>';
+            return;
+        }
+        
+        // Trier manuellement en mémoire
+        const agents = [];
+        snapshot.forEach(doc => {
+            agents.push({ id: doc.id, ...doc.data() });
+        });
+        agents.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+        
+        let html = '<div class="list-container">';
+        for (const data of agents) {
+            html += `<div class="list-item">
+                <div>
+                    <strong>${data.nom}</strong>
+                    <br><small>📞 ${data.telephone || 'N/A'} | 🔑 ${data.code_secret || 'N/A'}</small>
+                </div>
+                <div>
+                    <button onclick="editAgent('${data.id}')" class="btn-edit">✏️</button>
+                    <button onclick="deleteAgent('${data.id}')" class="btn-delete">🗑️</button>
+                    <button onclick="resetAgentCode('${data.id}')" class="btn-edit" style="background:#fef9e7;">🔑</button>
+                </div>
+            </div>`;
+        }
+        html += '</div>';
+        container.innerHTML = html;
+    } catch(e) { 
+        console.error('Erreur chargement agents:', e);
+        document.getElementById('agentsList').innerHTML = '<p class="empty-message">❌ Erreur de chargement.</p>';
+    }
+}
+
+function openAgentForm() {
+    playSound('click');
+    const nom = prompt('Nom de l\'agent :');
+    if (!nom) return;
+    const tel = prompt('Téléphone :');
+    if (!tel) return;
+    
+    let code = generateCodeSecret();
+    db.collection('users').where('code_secret','==',code).get().then(s => {
+        if (!s.empty) code = generateCodeSecret();
+        return db.collection('users').add({
+            nom: nom,
+            role: 'agent',
+            code_secret: code,
+            telephone: tel,
+            dateCreation: new Date()
+        });
+    }).then(() => {
+        playSound('success');
+        showToast(`✅ Agent ajouté ! Code: ${code}`, 'success');
+        if (confirm(`Envoyer le code (${code}) par WhatsApp ?`)) {
+            const phone = tel.replace('+','');
+            window.open(`https://wa.me/${phone}?text=Bonjour ${nom}, votre code agent HDIX est: ${code}`, '_blank');
+        }
+        loadAgents();
+        loadKPI();
+    }).catch(e => { console.error(e); showToast('❌ Erreur.', 'error'); });
+}
+
+async function deleteAgent(id) {
+    playSound('click');
+    if (!confirm('Supprimer cet agent ?')) return;
+    try {
+        await db.collection('users').doc(id).delete();
+        playSound('success');
+        showToast('✅ Agent supprimé.', 'success');
+        loadAgents();
+        loadKPI();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
+}
+
+async function editAgent(id) {
+    playSound('click');
+    const doc = await db.collection('users').doc(id).get();
+    const data = doc.data();
+    const nom = prompt('Nom:', data.nom); if (!nom) return;
+    const tel = prompt('Téléphone:', data.telephone); if (!tel) return;
+    await db.collection('users').doc(id).update({ nom, telephone: tel });
+    playSound('success');
+    showToast('✅ Agent modifié.', 'success');
+    loadAgents();
+}
+
+async function resetAgentCode(id) {
+    playSound('click');
+    if (!confirm('Réinitialiser le code secret de cet agent ?')) return;
+    try {
+        const newCode = await generateUniqueCode();
+        await db.collection('users').doc(id).update({ code_secret: newCode });
+        const doc = await db.collection('users').doc(id).get();
+        const data = doc.data();
+        playSound('success');
+        showToast(`✅ Nouveau code: ${newCode}`, 'success');
+        if (confirm(`Envoyer le nouveau code (${newCode}) par WhatsApp ?`)) {
+            const phone = data.telephone.replace('+','');
+            window.open(`https://wa.me/${phone}?text=Bonjour ${data.nom}, votre nouveau code agent HDIX est: ${newCode}`, '_blank');
+        }
+        loadAgents();
+    } catch(e) { showToast('❌ Erreur.', 'error'); }
+}
+
 // ========== RÉPARER LES VENDEURS ==========
 async function reparerVendeurs() {
     playSound('click');
@@ -1075,7 +1194,9 @@ async function loadInscriptions() {
     try {
         const container = document.getElementById('inscriptionsList');
         container.innerHTML = '<div class="spinner" style="margin:20px auto;"></div>';
-        const snapshot = await db.collection('inscriptions').orderBy('dateDemande', 'desc').get();
+        const snapshot = await db.collection('inscriptions')
+            .orderBy('dateDemande', 'desc')
+            .get();
         if (snapshot.empty) {
             container.innerHTML = '<p class="empty-message">Aucune demande d\'inscription.</p>';
             return;
@@ -1645,15 +1766,37 @@ async function loadVendeursForBilan() {
 // ========== INIT ==========
 document.addEventListener('DOMContentLoaded', function() {
     const user = sessionStorage.getItem('user');
-    if (!user) { window.location.href = 'index.html'; return; }
+    if (!user) {
+        window.location.href = 'index.html';
+        return;
+    }
     try {
         const u = JSON.parse(user);
         document.getElementById('adminName').textContent = u.nom || 'Admin';
-        if (u.role !== 'admin') { window.location.href = 'index.html'; return; }
-    } catch { window.location.href = 'index.html'; return; }
+        if (u.role !== 'admin') {
+            window.location.href = 'index.html';
+            return;
+        }
+    } catch {
+        window.location.href = 'index.html';
+        return;
+    }
 
     // Charger la section par défaut (Commandes)
-    showSection('commandes');
+    const defaultSection = document.getElementById('section-commandes');
+    if (defaultSection) {
+        defaultSection.style.display = 'block';
+        const defaultSub = document.getElementById('sub-commandes-liste');
+        if (defaultSub) {
+            defaultSub.style.display = 'block';
+            defaultSub.classList.add('active');
+        }
+    }
+    
+    // Charger les données par défaut
+    loadCommandes();
+    loadAppels();
+    loadVendeursForBilan();
 
     // Fermer les modales en cliquant sur le fond
     document.getElementById('commandeModal').addEventListener('click', function(e) {
@@ -1681,140 +1824,3 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.target === this) closeRetraitModal();
     });
 });
-// ========== GESTION DES DROPDOWNS ACCORDÉON ==========
-
-function toggleDropdown(section) {
-    const dropdown = document.getElementById(`dropdown-${section}`);
-    const arrow = document.getElementById(`arrow-${section}`);
-    
-    // Fermer tous les autres dropdowns
-    document.querySelectorAll('.dropdown-menu').forEach(el => {
-        if (el.id !== `dropdown-${section}`) {
-            el.classList.remove('open');
-            const arrowId = el.id.replace('dropdown-', 'arrow-');
-            const otherArrow = document.getElementById(arrowId);
-            if (otherArrow) otherArrow.classList.remove('open');
-        }
-    });
-    
-    // Basculer celui-ci
-    dropdown.classList.toggle('open');
-    if (arrow) arrow.classList.toggle('open');
-}
-
-function selectSubSection(section, subSection, element) {
-    // Mettre à jour le dropdown
-    const dropdown = document.getElementById(`dropdown-${section}`);
-    dropdown.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
-    element.classList.add('active');
-    
-    // Fermer le dropdown
-    dropdown.classList.remove('open');
-    const arrow = document.getElementById(`arrow-${section}`);
-    if (arrow) arrow.classList.remove('open');
-    
-    // Afficher la sous-section
-    document.querySelectorAll(`#section-${section} .sub-section`).forEach(el => {
-        el.classList.remove('active');
-        el.style.display = 'none';
-    });
-    
-    const target = document.getElementById(`sub-${subSection}`);
-    if (target) {
-        target.classList.add('active');
-        target.style.display = 'block';
-    }
-    
-    // Charger les données
-    if (subSection === 'commandes-liste') loadCommandes();
-    if (subSection === 'commandes-appels') loadAppels();
-    if (subSection === 'commandes-tournees') optimiserTournees();
-    if (subSection === 'admin-vendeurs') loadVendeurs();
-    if (subSection === 'admin-agents') loadAgents();  // ← NOUVEAU
-    if (subSection === 'admin-livreurs') loadLivreurs();
-    if (subSection === 'admin-inscriptions') loadInscriptions();
-    if (subSection === 'bilan-kpi') loadKPI();
-    if (subSection === 'bilan-general') loadVendeursForBilan();
-    if (subSection === 'bilan-tresorerie') loadTresorerie();
-}
-
-// Fonction pour afficher une section sans dropdown (ex: Stocks)
-function showSection(section) {
-    // Activer le bon onglet
-    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
-    
-    // Cacher toutes les sections
-    document.querySelectorAll('.section').forEach(el => el.style.display = 'none');
-    
-    // Afficher la section demandée
-    document.getElementById(`section-${section}`).style.display = 'block';
-    
-    // Fermer tous les dropdowns
-    document.querySelectorAll('.dropdown-menu').forEach(el => el.classList.remove('open'));
-    document.querySelectorAll('.arrow').forEach(el => el.classList.remove('open'));
-    
-    // Charger les données
-    if (section === 'stocks') loadStockage();
-}
-// ========== AGENTS ==========
-async function loadAgents() {
-    try {
-        // Requête simplifiée SANS orderBy pour éviter l'index
-        const snapshot = await db.collection('users')
-            .where('role', '==', 'agent')
-            .get();
-        
-        const container = document.getElementById('agentsList');
-        
-        if (snapshot.empty) {
-            container.innerHTML = '<p class="empty-message">Aucun agent enregistré.</p>';
-            return;
-        }
-        
-        // Trier manuellement en mémoire
-        const agents = [];
-        snapshot.forEach(doc => {
-            agents.push({ id: doc.id, ...doc.data() });
-        });
-        agents.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
-        
-        let html = '<div class="list-container">';
-        for (const data of agents) {
-            html += `<div class="list-item">
-                <div>
-                    <strong>${data.nom}</strong>
-                    <br><small>📞 ${data.telephone || 'N/A'} | 🔑 ${data.code_secret || 'N/A'}</small>
-                </div>
-                <div>
-                    <button onclick="editAgent('${data.id}')" class="btn-edit">✏️</button>
-                    <button onclick="deleteAgent('${data.id}')" class="btn-delete">🗑️</button>
-                    <button onclick="resetAgentCode('${data.id}')" class="btn-edit" style="background:#fef9e7;">🔑</button>
-                </div>
-            </div>`;
-        }
-        html += '</div>';
-        container.innerHTML = html;
-    } catch(e) { 
-        console.error('Erreur chargement agents:', e);
-        document.getElementById('agentsList').innerHTML = '<p class="empty-message">❌ Erreur de chargement.</p>';
-    }
-}
-
-async function resetAgentCode(id) {
-    playSound('click');
-    if (!confirm('Réinitialiser le code secret de cet agent ?')) return;
-    try {
-        const newCode = await generateUniqueCode();
-        await db.collection('users').doc(id).update({ code_secret: newCode });
-        const doc = await db.collection('users').doc(id).get();
-        const data = doc.data();
-        playSound('success');
-        showToast(`✅ Nouveau code: ${newCode}`, 'success');
-        if (confirm(`Envoyer le nouveau code (${newCode}) par WhatsApp ?`)) {
-            const phone = data.telephone.replace('+','');
-            window.open(`https://wa.me/${phone}?text=Bonjour ${data.nom}, votre nouveau code agent HDIX est: ${newCode}`, '_blank');
-        }
-        loadAgents();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
