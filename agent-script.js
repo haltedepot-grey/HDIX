@@ -1,4 +1,4 @@
-// agent-script.js - Version complète avec toutes les corrections
+// agent-script.js - Version complète avec sélection multiple et numérotation
 
 // ========== SONS ==========
 let clickSoundA = null, successSoundA = null, errorSoundA = null;
@@ -32,10 +32,15 @@ function showToastA(message, type = 'info') {
 
 function formatNumberA(num) { if (num === undefined || num === null) return '0'; return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 
-function logoutA() { playSoundA('click'); sessionStorage.removeItem('user'); window.location.href = 'index.html'; }
+function showSpinnerA() { document.getElementById('globalSpinnerAgent').classList.add('active'); }
+function hideSpinnerA() { document.getElementById('globalSpinnerAgent').classList.remove('active'); }
+
+function logout() { playSoundA('click'); sessionStorage.removeItem('user'); window.location.href = 'index.html'; }
 
 // ========== TABLEAU DE BORD ==========
 let agentFiltre = 'all';
+let selectionModeAgent = false;
+let commandesSelectionneesAgent = [];
 
 async function loadAgentDashboard() {
     try {
@@ -77,7 +82,7 @@ function updateAlerteA(count) {
     }
 }
 
-// ========== COMMANDES ==========
+// ========== COMMANDES AGENT ==========
 async function loadAgentCommandes() {
     try {
         const today = new Date(); today.setHours(0,0,0,0);
@@ -87,11 +92,16 @@ async function loadAgentCommandes() {
         const snapshot = await query.get();
         const container = document.getElementById('agentCommandesContainer');
         if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune commande aujourd\'hui.</p>'; return; }
+        
         let html = '';
         snapshot.forEach(doc => {
             const data = doc.data();
             const sc = data.statut === 'Livrée' ? 'statut-livree' : data.statut === 'À appeler' ? 'statut-appel' : 'statut-attente';
+            
+            const checkbox = selectionModeAgent ? `<input type="checkbox" class="commande-check-agent" value="${doc.id}" onchange="updateSelectionAgent()" />` : '';
+            
             html += `<div class="commande-item" onclick="afficherCommandeA('${doc.id}')">
+                ${checkbox}
                 <span class="numero">${data.numero||'N/A'}</span>
                 <span class="localisation">📍 ${data.quartier||''}, ${data.ville||''}</span>
                 <span class="vendeur">${data.vendeur||'N/A'}</span>
@@ -101,10 +111,12 @@ async function loadAgentCommandes() {
                     <button onclick="event.stopPropagation(); modifierCommandeA('${doc.id}')" title="Modifier">✏️</button>
                     <button onclick="event.stopPropagation(); supprimerCommandeA('${doc.id}')" title="Supprimer">🗑️</button>
                     <button onclick="event.stopPropagation(); afficherCommandeA('${doc.id}')" title="Voir">👁️</button>
+                    ${data.statut !== 'Livrée' ? `<button onclick="event.stopPropagation(); assignerCommandeA('${doc.id}')">🚚</button>` : ''}
                 </span>
             </div>`;
         });
         container.innerHTML = html;
+        commandesSelectionneesAgent = [];
     } catch(e) { console.error(e); }
 }
 
@@ -113,6 +125,75 @@ function filtrerAgentCommandes(statut) {
     agentFiltre = statut;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === statut));
     loadAgentCommandes();
+}
+
+// ========== SÉLECTION MULTIPLE AGENT ==========
+function toggleSelectionModeAgent() {
+    selectionModeAgent = !selectionModeAgent;
+    const btn = document.querySelector('.btn-select-mode');
+    if (btn) {
+        btn.textContent = selectionModeAgent ? '☑️ Désélectionner' : '☑️ Sélectionner';
+        btn.classList.toggle('active', selectionModeAgent);
+    }
+    loadAgentCommandes();
+}
+
+function updateSelectionAgent() {
+    const checkboxes = document.querySelectorAll('.commande-check-agent:checked');
+    commandesSelectionneesAgent = Array.from(checkboxes).map(cb => cb.value);
+}
+
+async function assignerSelectionAgent() {
+    if (commandesSelectionneesAgent.length === 0) {
+        showToastA('⚠️ Sélectionnez au moins une commande.', 'error');
+        return;
+    }
+    
+    const livreursSnapshot = await db.collection('livreurs').where('actif', '==', true).get();
+    if (livreursSnapshot.empty) { showToastA('⚠️ Aucun livreur disponible.', 'error'); return; }
+    
+    let livreursList = [];
+    livreursSnapshot.forEach(doc => {
+        livreursList.push({ id: doc.id, ...doc.data() });
+    });
+    
+    let options = livreursList.map((l, index) => 
+        `${index + 1}. ${l.nom} (${l.zone || 'Sans zone'})`
+    ).join('\n');
+    
+    const choix = prompt(
+        `📋 ${commandesSelectionneesAgent.length} commandes sélectionnées.\n\nSélectionnez un livreur :\n\n${options}\n\nEntrez le numéro :`
+    );
+    
+    if (!choix) return;
+    
+    const idx = parseInt(choix) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= livreursList.length) {
+        showToastA('⚠️ Sélection invalide.', 'error');
+        return;
+    }
+    
+    const livreur = livreursList[idx];
+    
+    try {
+        for (const commandeId of commandesSelectionneesAgent) {
+            await db.collection('commandes').doc(commandeId).update({
+                livreurId: livreur.id,
+                livreurNom: livreur.nom,
+                statut: 'En-cours',
+                dateAssignation: new Date()
+            });
+        }
+        
+        playSoundA('success');
+        showToastA(`✅ ${commandesSelectionneesAgent.length} commandes assignées à ${livreur.nom} !`, 'success');
+        commandesSelectionneesAgent = [];
+        loadAgentCommandes();
+        loadAgentDashboard();
+    } catch(e) {
+        console.error('Erreur assignation multiple:', e);
+        showToastA('❌ Erreur lors de l\'assignation.', 'error');
+    }
 }
 
 // ========== MODALE NOUVELLE COMMANDE ==========
@@ -201,20 +282,35 @@ async function saveCommandeAgent() {
     const note = document.getElementById('commandeNoteAgent').value.trim();
     const zones = { 'Libreville':2000, 'Akanda':3000, 'Owendo':3000, 'Bikélé':3000, 'Autres':4000 };
     const fraisLivraison = fraisInclus ? 0 : (zones[zone] || 0);
-    const data = { articles, prixTotal: prix, fraisInclus, fraisLivraison, zone, quartier, ville, note, telephone, vendeurId, vendeur: vendeurNom, statut: 'À appeler', dateCreation: new Date() };
+
+    // Récupérer l'abréviation du vendeur
+    const vendeurDoc = await db.collection('vendeurs').doc(vendeurId).get();
+    const vendeurData = vendeurDoc.data();
+    const abreviation = vendeurData.abreviation || 'VEN';
+
+    // Compter les commandes du vendeur
+    const snapshot = await db.collection('commandes')
+        .where('vendeurId', '==', vendeurId)
+        .get();
+    const count = snapshot.size + 1;
+    const numero = `${abreviation}-${String(count).padStart(3, '0')}`;
+
+    const data = {
+        numero: numero,
+        articles, prixTotal: prix, fraisInclus, fraisLivraison, zone, quartier, ville, note, telephone,
+        vendeurId, vendeur: vendeurNom, statut: 'À appeler', dateCreation: new Date()
+    };
+
     try {
-        const snapshot = await db.collection('commandes').get();
-        const count = snapshot.size + 1;
-        data.numero = `HDIX-${String(count).padStart(3, '0')}`;
         await db.collection('commandes').add(data);
         playSoundA('success');
-        showToastA(`✅ Commande ${data.numero} enregistrée !`, 'success');
+        showToastA(`✅ Commande ${numero} enregistrée !`, 'success');
         closeCommandeModalAgent();
         loadAgentDashboard();
     } catch(e) { console.error(e); showToastA('❌ Erreur enregistrement.', 'error'); }
 }
 
-// ========== COLLAGE AVEC BOUTON COLLER ==========
+// ========== COLLAGE ==========
 function collerTexteAgent() {
     playSoundA('click');
     navigator.clipboard.readText().then(text => {
@@ -234,96 +330,6 @@ function analyserCollageAgent() {
     if (result.articles.length === 0) { showToastA('⚠️ Aucun article détecté.', 'error'); return; }
     afficherConfirmationCollageAgent(result);
 }
-
-function afficherConfirmationCollageAgent(result) {
-    const modal = document.getElementById('collageConfirmationModalAgent');
-    const content = document.getElementById('collageConfirmationContentAgent');
-    let articlesHtml = result.articles.map((a, idx) => `
-        <div style="display:flex;gap:8px;margin-bottom:4px;">
-            <input type="number" value="${a.quantite}" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-qtyAgent" />
-            <input type="text" value="${a.nom}" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-nameAgent" />
-        </div>
-    `).join('');
-    loadVendeursForSelectA('collageVendeurSelectAgent').then(() => {
-        if (result.vendeur) {
-            const select = document.getElementById('collageVendeurSelectAgent');
-            for (let i = 0; i < select.options.length; i++) {
-                if (select.options[i].textContent === result.vendeur) { select.value = select.options[i].value; break; }
-            }
-        }
-    });
-    content.innerHTML = `
-        <div class="step-title">📋 CONFIRMER LA COMMANDE</div>
-        <div class="step-subtitle">Vérifiez les informations détectées</div>
-        <div class="vendeur-select-row"><label>Vendeur *</label><select id="collageVendeurSelectAgent"><option value="">-- Sélectionnez --</option></select></div>
-        <div style="margin:12px 0;"><label>Articles</label><div id="collageArticlesContainerAgent">${articlesHtml}</div>
-        <button onclick="ajouterLigneArticleCollageAgent()" class="add-article-btn" style="margin-top:6px;">+ Ajouter un article</button></div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <div style="flex:1;"><label>💰 Prix total</label><input type="number" id="collagePrixAgent" value="${result.prix||''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
-            <div style="flex:1;"><label>🚚 Frais livraison</label><input type="number" id="collageFraisAgent" value="${result.frais||0}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
-            <div style="flex:1;"><label>📍 Quartier</label><input type="text" id="collageQuartierAgent" value="${result.lieu ? result.lieu.split(',')[0].trim() : ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
-            <div style="flex:1;"><label>Ville</label><input type="text" id="collageVilleAgent" value="${result.lieu && result.lieu.includes(',') ? result.lieu.split(',')[1].trim() : ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
-        </div>
-        <div style="margin-top:8px;"><label>📞 Téléphone client</label><input type="tel" id="collageTelephoneAgent" value="${result.telephone||''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
-        <div style="margin-top:8px;"><label>📝 Note</label><input type="text" id="collageNoteAgent" value="${result.note||''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
-        <div style="margin-top:12px;display:flex;gap:10px;">
-            <button onclick="enregistrerCollageAgent()" class="btn-success" style="flex:1;padding:12px;">✅ Enregistrer</button>
-            <button onclick="closeCollageConfirmationAgent()" class="btn-secondary" style="flex:1;padding:12px;">Annuler</button>
-        </div>
-    `;
-    window._collageResultAgent = result;
-    modal.classList.add('active');
-}
-
-function ajouterLigneArticleCollageAgent() {
-    const container = document.getElementById('collageArticlesContainerAgent');
-    const idx = container.querySelectorAll('.conf-qtyAgent').length;
-    const div = document.createElement('div');
-    div.style.display = 'flex'; div.style.gap = '8px'; div.style.marginBottom = '4px';
-    div.innerHTML = `<input type="number" value="1" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-qtyAgent" />
-        <input type="text" value="" placeholder="Nom" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-nameAgent" />`;
-    container.appendChild(div);
-}
-
-async function enregistrerCollageAgent() {
-    playSoundA('click');
-    const vendeurSelect = document.getElementById('collageVendeurSelectAgent');
-    const vendeurId = vendeurSelect.value;
-    if (!vendeurId) { showToastA('⚠️ Sélectionnez un vendeur.', 'error'); return; }
-    const vendeurNom = vendeurSelect.options[vendeurSelect.selectedIndex].textContent;
-    const qtyInputs = document.querySelectorAll('.conf-qtyAgent');
-    const nameInputs = document.querySelectorAll('.conf-nameAgent');
-    const articles = [];
-    for (let i=0; i<qtyInputs.length; i++) {
-        const nom = nameInputs[i].value.trim();
-        if (nom) articles.push({ quantite: parseInt(qtyInputs[i].value)||1, nom: nom });
-    }
-    if (articles.length === 0) { showToastA('⚠️ Ajoutez un article.', 'error'); return; }
-    const prix = parseInt(document.getElementById('collagePrixAgent').value) || 0;
-    if (prix <= 0) { showToastA('⚠️ Prix valide requis.', 'error'); return; }
-    const telephone = document.getElementById('collageTelephoneAgent').value.trim();
-    if (!telephone) { showToastA('⚠️ Téléphone client requis.', 'error'); return; }
-    const quartier = document.getElementById('collageQuartierAgent').value.trim();
-    const ville = document.getElementById('collageVilleAgent').value.trim();
-    if (!quartier || !ville) { showToastA('⚠️ Quartier et ville requis.', 'error'); return; }
-    const frais = parseInt(document.getElementById('collageFraisAgent').value) || 0;
-    const note = document.getElementById('collageNoteAgent').value.trim();
-    const data = { articles, prixTotal: prix, fraisLivraison: frais, zone: 'Non spécifiée', quartier, ville, note, telephone, vendeurId, vendeur: vendeurNom, statut: 'À appeler', dateCreation: new Date() };
-    try {
-        const snapshot = await db.collection('commandes').get();
-        const count = snapshot.size + 1;
-        data.numero = `HDIX-${String(count).padStart(3, '0')}`;
-        await db.collection('commandes').add(data);
-        playSoundA('success');
-        showToastA(`✅ Commande ${data.numero} enregistrée !`, 'success');
-        closeCollageConfirmationAgent(); closeCommandeModalAgent();
-        loadAgentDashboard();
-    } catch(e) { console.error(e); showToastA('❌ Erreur enregistrement.', 'error'); }
-}
-
-function closeCollageConfirmationAgent() { document.getElementById('collageConfirmationModalAgent').classList.remove('active'); }
 
 function analyserTexteAgent(text) {
     const result = { articles: [], vendeur: '', prix: null, frais: 0, lieu: '', telephone: '', note: '' };
@@ -530,6 +536,42 @@ function appelerClientDepuisCommandeA(telephone) {
 
 function closeDetailCommandeModalAgent() { document.getElementById('detailCommandeModalAgent').classList.remove('active'); }
 
+// ========== COMMANDES CRUD ==========
+async function modifierCommandeA(id) {
+    playSoundA('click');
+    await openCommandeModalAgent(id);
+}
+
+async function supprimerCommandeA(id) {
+    playSoundA('click');
+    if (!confirm('⚠️ Supprimer définitivement cette commande ?')) return;
+    try {
+        await db.collection('commandes').doc(id).delete();
+        playSoundA('success');
+        showToastA('🗑️ Commande supprimée.', 'success');
+        loadAgentDashboard();
+    } catch(e) { showToastA('❌ Erreur suppression.', 'error'); }
+}
+
+async function assignerCommandeA(commandeId) {
+    playSoundA('click');
+    try {
+        const livreurs = await db.collection('livreurs').where('actif','==',true).get();
+        if (livreurs.empty) { showToastA('⚠️ Aucun livreur disponible.', 'error'); return; }
+        let list = []; livreurs.forEach(d => list.push({ id: d.id, ...d.data() }));
+        const opts = list.map((l,i) => `${i+1}. ${l.nom} (${l.zone||'Sans zone'})`).join('\n');
+        const choix = prompt(`Sélectionnez un livreur:\n\n${opts}\n\nEntrez le numéro:`);
+        if (!choix) return;
+        const idx = parseInt(choix)-1;
+        if (isNaN(idx)||idx<0||idx>=list.length) { showToastA('⚠️ Sélection invalide.', 'error'); return; }
+        const livreur = list[idx];
+        await db.collection('commandes').doc(commandeId).update({ livreurId: livreur.id, livreurNom: livreur.nom, statut: 'En-cours', dateAssignation: new Date() });
+        playSoundA('success');
+        showToastA(`✅ Commande assignée à ${livreur.nom} !`, 'success');
+        loadAgentDashboard();
+    } catch(e) { showToastA('❌ Erreur assignation.', 'error'); }
+}
+
 // ========== STOCK AGENT ==========
 function openStockModalAgent() {
     playSoundA('click');
@@ -645,22 +687,9 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch { window.location.href = 'index.html'; return; }
     loadAgentDashboard();
 
-    document.getElementById('commandeModalAgent').addEventListener('click', function(e) {
-        if (e.target === this) closeCommandeModalAgent();
-    });
-    document.getElementById('stockModalAgent').addEventListener('click', function(e) {
-        if (e.target === this) closeStockModalAgent();
-    });
-    document.getElementById('consulterStockModalAgent').addEventListener('click', function(e) {
-        if (e.target === this) closeConsulterStockModalAgent();
-    });
-    document.getElementById('appelModalAgent').addEventListener('click', function(e) {
-        if (e.target === this) fermerAppelModalA();
-    });
-    document.getElementById('detailCommandeModalAgent').addEventListener('click', function(e) {
-        if (e.target === this) closeDetailCommandeModalAgent();
-    });
-    document.getElementById('collageConfirmationModalAgent').addEventListener('click', function(e) {
-        if (e.target === this) closeCollageConfirmationAgent();
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('active');
+        });
     });
 });

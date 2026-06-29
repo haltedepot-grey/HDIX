@@ -5,18 +5,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>HDIX - Agent</title>
 
-    <!-- Favicons -->
     <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png" />
     <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="assets/favicon.ico" />
-
     <meta name="theme-color" content="#1a2b4c" />
+
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" href="style.css" />
+    <style>
+        .commande-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin-right: 8px;
+            cursor: pointer;
+            accent-color: #1a2b4c;
+            flex-shrink: 0;
+        }
+        .agent-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 12px 0;
+        }
+        .agent-actions button {
+            flex: 1;
+            min-width: 150px;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-assign-multiple {
+            background: #8e44ad;
+            color: white;
+        }
+        .btn-assign-multiple:hover {
+            background: #7d3c98;
+        }
+        .btn-select-mode {
+            background: #f1f3f5;
+            color: #1a2b4c;
+        }
+        .btn-select-mode:hover {
+            background: #e2e8f0;
+        }
+        .btn-select-mode.active {
+            background: #1a2b4c;
+            color: white;
+        }
+        .alerte-appels {
+            background: #dc3545;
+            color: white;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin: 16px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+        }
+        .alerte-appels .message {
+            font-size: 18px;
+            font-weight: 700;
+        }
+        .alerte-appels .message .count {
+            font-size: 24px;
+        }
+        .alerte-appels .btn-lancer {
+            background: white;
+            color: #dc3545;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .alerte-appels.ok {
+            background: #2d7d46;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+        .alerte-appels.ok .btn-lancer {
+            display: none;
+        }
+    </style>
 </head>
 <body>
 <div class="app-container">
@@ -31,7 +111,7 @@
         </div>
         <div class="header-right">
             <span id="agentName">Agent</span>
-            <button onclick="logoutA()" class="btn-logout">Déconnexion</button>
+            <button onclick="logout()" class="btn-logout">Déconnexion</button>
         </div>
     </header>
 
@@ -48,18 +128,27 @@
         <div class="stat-card"><span class="stat-number" id="statLivree">0</span><span class="stat-label">Livrées</span></div>
     </div>
 
-    <!-- LISTE COMMANDES -->
+    <!-- COMMANDES -->
     <div class="commandes-list">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
             <h3>📋 Commandes</h3>
             <button onclick="loadAgentCommandes()" class="refresh-btn">🔄</button>
         </div>
+
+        <!-- Actions Agent -->
+        <div class="agent-actions">
+            <button onclick="openCommandeModalAgent()" class="btn-create" style="flex:1;min-width:150px;">✨ Nouvelle commande</button>
+            <button onclick="assignerSelectionAgent()" class="btn-assign-multiple">🚚 Assigner sélection</button>
+            <button onclick="toggleSelectionModeAgent()" class="btn-select-mode">☑️ Sélectionner</button>
+        </div>
+
         <div class="filter-buttons">
             <button onclick="filtrerAgentCommandes('all')" class="filter-btn active" data-filter="all">📋 Toutes</button>
             <button onclick="filtrerAgentCommandes('À appeler')" class="filter-btn" data-filter="À appeler" style="background:#fef9e7;">📞 À appeler</button>
             <button onclick="filtrerAgentCommandes('En-cours')" class="filter-btn" data-filter="En-cours" style="background:#ebf5fb;">🔄 En-cours</button>
             <button onclick="filtrerAgentCommandes('Livrée')" class="filter-btn" data-filter="Livrée" style="background:#eafaf1;">✅ Livrée</button>
         </div>
+
         <div id="agentCommandesContainer"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
 
@@ -102,23 +191,13 @@
             <button onclick="saveCommandeAgent()" class="btn-primary btn-success">✅ Enregistrer</button>
         </div>
         <div id="modeCollageAgent" style="display:none;">
-            <div class="collage-zone">
-                <textarea id="collageInputAgent" rows="6" placeholder="Collez le bon de commande ici..."></textarea>
-            </div>
+            <div class="collage-zone"><textarea id="collageInputAgent" rows="6" placeholder="Collez le bon de commande ici..."></textarea></div>
             <div style="display:flex;gap:10px;margin-top:8px;">
                 <button onclick="collerTexteAgent()" class="btn-secondary" style="flex:1;">📋 Coller</button>
                 <button onclick="analyserCollageAgent()" class="btn-collage" style="flex:1;">🔍 Analyser</button>
             </div>
             <div id="collageResultAgent" style="margin-top:16px;"></div>
         </div>
-    </div>
-</div>
-
-<!-- MODALE CONFIRMATION COLLAGE (Agent) -->
-<div class="modal" id="collageConfirmationModalAgent">
-    <div class="modal-content" style="max-width:550px;">
-        <button class="modal-close" onclick="closeCollageConfirmationAgent()">✕</button>
-        <div id="collageConfirmationContentAgent"><div class="spinner" style="margin:20px auto;"></div></div>
     </div>
 </div>
 
