@@ -1,4 +1,5 @@
-// admin-script.js - Version complète avec navigation corrigée
+// admin-script.js - Version simplifiée
+// (seulement les fonctions essentielles pour la version "tableau blanc")
 
 // ========== SONS ==========
 let clickSound = null, successSound = null, errorSound = null;
@@ -35,102 +36,25 @@ function formatNumber(num) { if (num === undefined || num === null) return '0'; 
 function showSpinner() { document.getElementById('globalSpinner').classList.add('active'); }
 function hideSpinner() { document.getElementById('globalSpinner').classList.remove('active'); }
 
-// ========== NAVIGATION ==========
+function logout() { playSound('click'); sessionStorage.removeItem('user'); window.location.href = 'index.html'; }
+
+// ========== NAVIGATION SIMPLIFIÉE ==========
 function showSection(section) {
     playSound('click');
+    document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     
-    // Cacher toutes les sections
-    document.querySelectorAll('.section').forEach(el => el.style.display = 'none');
+    document.getElementById(`section-${section}`).classList.add('active');
+    document.querySelector(`.nav-btn[onclick="showSection('${section}')"]`).classList.add('active');
     
-    // Afficher la section demandée
-    const target = document.getElementById(`section-${section}`);
-    if (target) target.style.display = 'block';
-    
-    // Fermer tous les dropdowns
-    document.querySelectorAll('.dropdown-menu').forEach(el => el.classList.remove('open'));
-    document.querySelectorAll('.arrow').forEach(el => el.classList.remove('open'));
-    
-    // Charger les données
-    if (section === 'commandes') { loadCommandes(); loadAppels(); }
-    if (section === 'stocks') loadStockage();
+    if (section === 'commandes') { loadCommandes(); }
+    if (section === 'stocks') { loadStockage(); }
     if (section === 'administration') { loadVendeurs(); loadAgents(); loadLivreurs(); loadInscriptions(); }
     if (section === 'bilan') { loadKPI(); loadVendeursForBilan(); loadTresorerie(); }
 }
 
-function logout() { playSound('click'); sessionStorage.removeItem('user'); window.location.href = 'index.html'; }
-
-// ========== GESTION DES DROPDOWNS ACCORDÉON ==========
-
-function toggleDropdown(section) {
-    const dropdown = document.getElementById(`dropdown-${section}`);
-    const arrow = document.getElementById(`arrow-${section}`);
-    
-    if (!dropdown) return;
-    
-    // Fermer tous les autres dropdowns
-    document.querySelectorAll('.dropdown-menu').forEach(el => {
-        if (el.id !== `dropdown-${section}`) {
-            el.classList.remove('open');
-            const arrowId = el.id.replace('dropdown-', 'arrow-');
-            const otherArrow = document.getElementById(arrowId);
-            if (otherArrow) otherArrow.classList.remove('open');
-        }
-    });
-    
-    // Basculer celui-ci
-    dropdown.classList.toggle('open');
-    if (arrow) arrow.classList.toggle('open');
-}
-
-function selectSubSection(section, subSection, element) {
-    // Mettre à jour le dropdown
-    const dropdown = document.getElementById(`dropdown-${section}`);
-    if (dropdown) {
-        dropdown.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
-        if (element) element.classList.add('active');
-    }
-    
-    // Fermer le dropdown
-    if (dropdown) dropdown.classList.remove('open');
-    const arrow = document.getElementById(`arrow-${section}`);
-    if (arrow) arrow.classList.remove('open');
-    
-    // Cacher toutes les sous-sections de cette section
-    const sectionElement = document.getElementById(`section-${section}`);
-    if (sectionElement) {
-        sectionElement.querySelectorAll('.sub-section').forEach(el => {
-            el.classList.remove('active');
-            el.style.display = 'none';
-        });
-    }
-    
-    // Afficher la sous-section demandée
-    const target = document.getElementById(`sub-${subSection}`);
-    if (target) {
-        target.classList.add('active');
-        target.style.display = 'block';
-    }
-    
-    // Charger les données
-    loadSubSectionData(subSection);
-}
-
-function loadSubSectionData(subSection) {
-    if (subSection === 'commandes-liste') loadCommandes();
-    else if (subSection === 'commandes-appels') loadAppels();
-    else if (subSection === 'commandes-tournees') optimiserTournees();
-    else if (subSection === 'admin-vendeurs') loadVendeurs();
-    else if (subSection === 'admin-agents') loadAgents();
-    else if (subSection === 'admin-livreurs') loadLivreurs();
-    else if (subSection === 'admin-inscriptions') loadInscriptions();
-    else if (subSection === 'bilan-kpi') loadKPI();
-    else if (subSection === 'bilan-general') loadVendeursForBilan();
-    else if (subSection === 'bilan-tresorerie') loadTresorerie();
-}
-
 // ========== KPI ==========
 async function loadKPI() {
-    showSpinner();
     try {
         const today = new Date(); today.setHours(0,0,0,0);
         const snapshot = await db.collection('commandes').where('dateCreation', '>=', today).get();
@@ -149,7 +73,6 @@ async function loadKPI() {
         const moy = livree > 0 ? Math.round(ca/livree) : 0;
         document.getElementById('kpiMoyenne').textContent = formatNumber(moy);
     } catch(e) { console.error(e); }
-    hideSpinner();
 }
 
 // ========== COMMANDES ==========
@@ -304,7 +227,7 @@ function collerTexte() {
     playSound('click');
     navigator.clipboard.readText().then(text => {
         document.getElementById('collageInput').value = text;
-        showToast('✅ Texte collé ! Analyse automatique en cours...', 'success');
+        showToast('✅ Texte collé !', 'success');
         setTimeout(analyserCollage, 400);
     }).catch(() => {
         showToast('⚠️ Collez manuellement (Ctrl+V).', 'error');
@@ -319,96 +242,6 @@ function analyserCollage() {
     if (result.articles.length === 0) { showToast('⚠️ Aucun article détecté.', 'error'); return; }
     afficherConfirmationCollage(result);
 }
-
-function afficherConfirmationCollage(result) {
-    const modal = document.getElementById('collageConfirmationModal');
-    const content = document.getElementById('collageConfirmationContent');
-    let articlesHtml = result.articles.map((a, idx) => `
-        <div style="display:flex;gap:8px;margin-bottom:4px;">
-            <input type="number" value="${a.quantite}" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-qty" />
-            <input type="text" value="${a.nom}" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-name" />
-        </div>
-    `).join('');
-    loadVendeursForSelect('collageVendeurSelect').then(() => {
-        if (result.vendeur) {
-            const select = document.getElementById('collageVendeurSelect');
-            for (let i = 0; i < select.options.length; i++) {
-                if (select.options[i].textContent === result.vendeur) { select.value = select.options[i].value; break; }
-            }
-        }
-    });
-    content.innerHTML = `
-        <div class="step-title">📋 CONFIRMER LA COMMANDE</div>
-        <div class="step-subtitle">Vérifiez les informations détectées</div>
-        <div class="vendeur-select-row"><label>Vendeur *</label><select id="collageVendeurSelect"><option value="">-- Sélectionnez --</option></select></div>
-        <div style="margin:12px 0;"><label>Articles</label><div id="collageArticlesContainer">${articlesHtml}</div>
-        <button onclick="ajouterLigneArticleCollage()" class="add-article-btn" style="margin-top:6px;">+ Ajouter un article</button></div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <div style="flex:1;"><label>💰 Prix total</label><input type="number" id="collagePrix" value="${result.prix||''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
-            <div style="flex:1;"><label>🚚 Frais livraison</label><input type="number" id="collageFrais" value="${result.frais||0}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
-            <div style="flex:1;"><label>📍 Quartier</label><input type="text" id="collageQuartier" value="${result.lieu ? result.lieu.split(',')[0].trim() : ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
-            <div style="flex:1;"><label>Ville</label><input type="text" id="collageVille" value="${result.lieu && result.lieu.includes(',') ? result.lieu.split(',')[1].trim() : ''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
-        </div>
-        <div style="margin-top:8px;"><label>📞 Téléphone client</label><input type="tel" id="collageTelephone" value="${result.telephone||''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
-        <div style="margin-top:8px;"><label>📝 Note</label><input type="text" id="collageNote" value="${result.note||''}" style="width:100%;padding:8px;border:1px solid #e2e8f0;border-radius:4px;" /></div>
-        <div style="margin-top:12px;display:flex;gap:10px;">
-            <button onclick="enregistrerCollage()" class="btn-success" style="flex:1;padding:12px;">✅ Enregistrer</button>
-            <button onclick="closeCollageConfirmation()" class="btn-secondary" style="flex:1;padding:12px;">Annuler</button>
-        </div>
-    `;
-    window._collageResult = result;
-    modal.classList.add('active');
-}
-
-function ajouterLigneArticleCollage() {
-    const container = document.getElementById('collageArticlesContainer');
-    const idx = container.querySelectorAll('.conf-qty').length;
-    const div = document.createElement('div');
-    div.style.display = 'flex'; div.style.gap = '8px'; div.style.marginBottom = '4px';
-    div.innerHTML = `<input type="number" value="1" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-qty" />
-        <input type="text" value="" placeholder="Nom" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="conf-name" />`;
-    container.appendChild(div);
-}
-
-async function enregistrerCollage() {
-    playSound('click');
-    const vendeurSelect = document.getElementById('collageVendeurSelect');
-    const vendeurId = vendeurSelect.value;
-    if (!vendeurId) { showToast('⚠️ Sélectionnez un vendeur.', 'error'); return; }
-    const vendeurNom = vendeurSelect.options[vendeurSelect.selectedIndex].textContent;
-    const qtyInputs = document.querySelectorAll('.conf-qty');
-    const nameInputs = document.querySelectorAll('.conf-name');
-    const articles = [];
-    for (let i=0; i<qtyInputs.length; i++) {
-        const nom = nameInputs[i].value.trim();
-        if (nom) articles.push({ quantite: parseInt(qtyInputs[i].value)||1, nom: nom });
-    }
-    if (articles.length === 0) { showToast('⚠️ Ajoutez un article.', 'error'); return; }
-    const prix = parseInt(document.getElementById('collagePrix').value) || 0;
-    if (prix <= 0) { showToast('⚠️ Prix valide requis.', 'error'); return; }
-    const telephone = document.getElementById('collageTelephone').value.trim();
-    if (!telephone) { showToast('⚠️ Téléphone client requis.', 'error'); return; }
-    const quartier = document.getElementById('collageQuartier').value.trim();
-    const ville = document.getElementById('collageVille').value.trim();
-    if (!quartier || !ville) { showToast('⚠️ Quartier et ville requis.', 'error'); return; }
-    const frais = parseInt(document.getElementById('collageFrais').value) || 0;
-    const note = document.getElementById('collageNote').value.trim();
-    const data = { articles, prixTotal: prix, fraisLivraison: frais, zone: 'Non spécifiée', quartier, ville, note, telephone, vendeurId, vendeur: vendeurNom, statut: 'À appeler', dateCreation: new Date(), admin: 'Admin' };
-    try {
-        const snapshot = await db.collection('commandes').get();
-        const count = snapshot.size + 1;
-        data.numero = `HDIX-${String(count).padStart(3, '0')}`;
-        await db.collection('commandes').add(data);
-        playSound('success');
-        showToast(`✅ Commande ${data.numero} enregistrée !`, 'success');
-        closeCollageConfirmation(); closeCommandeModal();
-        loadCommandes(); loadAppels(); loadKPI();
-    } catch(e) { console.error(e); showToast('❌ Erreur enregistrement.', 'error'); }
-}
-
-function closeCollageConfirmation() { document.getElementById('collageConfirmationModal').classList.remove('active'); }
 
 function analyserTexte(text) {
     const result = { articles: [], vendeur: '', prix: null, frais: 0, lieu: '', telephone: '', note: '' };
@@ -431,256 +264,9 @@ function analyserTexte(text) {
     return result;
 }
 
-// ========== APPELS ==========
-let fileAppel = [], indexAppel = 0;
+// ========== AUTRES FONCTIONS ESSENTIELLES ==========
 
-async function loadAppels() {
-    try {
-        const snapshot = await db.collection('commandes').where('statut','==','À appeler').orderBy('dateCreation','asc').get();
-        const container = document.getElementById('appelsContainer');
-        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune commande en attente.</p>'; return; }
-        let html = '';
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            html += `<div class="commande-item"><span class="numero">${data.numero}</span><span class="vendeur">${data.vendeur}</span>
-                <span class="montant">${formatNumber(data.prixTotal)} FCFA</span><span class="statut statut-appel">${data.statut}</span></div>`;
-        });
-        container.innerHTML = html;
-    } catch(e) { console.error(e); }
-}
-
-function lancerAppelSuivant() {
-    playSound('click');
-    db.collection('commandes').where('statut','==','À appeler').orderBy('dateCreation','asc').get()
-        .then(snapshot => {
-            if (snapshot.empty) { showToast('✅ Aucune commande en attente.', 'success'); return; }
-            fileAppel = []; snapshot.forEach(doc => fileAppel.push({ id: doc.id, data: doc.data() }));
-            indexAppel = 0;
-            afficherAppel();
-        })
-        .catch(e => { console.error(e); showToast('❌ Erreur chargement appels.', 'error'); });
-}
-
-function afficherAppel() {
-    if (indexAppel >= fileAppel.length) {
-        fermerAppelModal();
-        showToast('✅ Tous les appels traités !', 'success');
-        loadAppels(); loadCommandes(); loadKPI();
-        return;
-    }
-    const item = fileAppel[indexAppel];
-    const data = item.data;
-    const modal = document.getElementById('appelModal');
-    const content = document.getElementById('appelContent');
-    const articles = data.articles ? data.articles.map(a => `${a.quantite} x ${a.nom}`).join(', ') : '';
-    const telephone = data.telephone || '';
-    const statuts = ['À appeler', 'Validé', 'En-cours', 'Livrée', 'Indisponible', 'Va rappeler', 'Annulée', 'Refusée', 'Reportée'];
-    let statutOptions = '';
-    statuts.forEach(s => { const selected = data.statut === s ? 'selected' : ''; statutOptions += `<option value="${s}" ${selected}>${s}</option>`; });
-    content.innerHTML = `
-        <div class="step-title">📞 APPEL CLIENT</div>
-        <div class="step-subtitle">Bon ${indexAppel+1} sur ${fileAppel.length}</div>
-        <div class="recap-item"><span>Commande</span><span>${data.numero}</span></div>
-        <div class="recap-item"><span>Vendeur</span><span>${data.vendeur}</span></div>
-        <div class="recap-item"><span>Articles</span><span>${articles}</span></div>
-        <div class="recap-item"><span>Lieu</span><span>${data.quartier}, ${data.ville}</span></div>
-        <div class="recap-item"><span>Montant</span><span>${formatNumber(data.prixTotal)} FCFA</span></div>
-        <div class="recap-item"><span>📞 Téléphone</span><span><strong>${telephone || 'Non renseigné'}</strong></span></div>
-        <div class="recap-item"><span>📌 Statut</span>
-            <span><select id="appelStatut" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;">${statutOptions}</select></span>
-        </div>
-        <div style="margin:16px 0;display:flex;gap:10px;flex-wrap:wrap;">
-            ${telephone ? `<button onclick="appelerClient('${item.id}')" class="btn-primary" style="flex:1;">📞 Appeler</button>` : ''}
-            <button onclick="whatsappClient('${item.id}')" class="btn-primary" style="flex:1;background:#25D366;">💬 WhatsApp</button>
-            <button onclick="smsClient('${item.id}')" class="btn-primary" style="flex:1;background:#8e44ad;">🤖 IA</button>
-        </div>
-        <div style="margin:16px 0;display:flex;gap:10px;flex-wrap:wrap;">
-            <button onclick="validerAppel('${item.id}')" class="btn-success" style="flex:1;padding:12px;">✅ Valider</button>
-            <button onclick="fermerAppelModal()" class="btn-secondary" style="flex:1;padding:12px;">Fermer</button>
-        </div>
-        <p class="info-text">Le prochain bon apparaîtra automatiquement après validation.</p>`;
-    modal.classList.add('active');
-}
-
-function fermerAppelModal() { document.getElementById('appelModal').classList.remove('active'); }
-document.getElementById('appelModal').addEventListener('click', function(e) { if (e.target === this) fermerAppelModal(); });
-
-async function validerAppel(id) {
-    const statut = document.getElementById('appelStatut').value;
-    try {
-        await db.collection('commandes').doc(id).update({ statut: statut, dateAppel: new Date() });
-        playSound('success');
-        showToast(`✅ Commande ${statut}`, 'success');
-        indexAppel++;
-        afficherAppel();
-        loadCommandes(); loadAppels(); loadKPI();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-function appelerClient(id) {
-    playSound('click');
-    db.collection('commandes').doc(id).get().then(doc => {
-        const data = doc.data();
-        const phone = data.telephone || prompt('Numéro du client :');
-        if (phone) { window.location.href = `tel:${phone.replace(/[^0-9+]/g, '')}`; }
-        showToast('📞 Appel en cours...', 'info');
-    });
-}
-
-function whatsappClient(id) {
-    playSound('click');
-    db.collection('commandes').doc(id).get().then(doc => {
-        const data = doc.data();
-        const phone = data.telephone || prompt('Numéro WhatsApp :');
-        if (phone) { window.open(`https://wa.me/${phone.replace(/[^0-9+]/g,'').replace('+','')}?text=Bonjour, nous vous confirmons votre livraison (${data.numero}).`, '_blank'); }
-    });
-}
-
-function smsClient(id) {
-    playSound('click');
-    db.collection('commandes').doc(id).get().then(doc => {
-        const data = doc.data();
-        const phone = data.telephone || prompt('Numéro :');
-        if (phone) {
-            const lien = `https://hdix.vercel.app/confirmation/${id}`;
-            const msg = `📦 Commande ${data.numero}\nConfirmez : OK -> ${lien}/ok | Appelez-moi -> ${lien}/appel | Indisponible -> ${lien}/non`;
-            window.open(`https://wa.me/${phone.replace(/[^0-9+]/g,'').replace('+','')}?text=${encodeURIComponent(msg)}`, '_blank');
-        }
-    });
-}
-
-// ========== MODALE DÉTAIL ==========
-async function afficherCommande(id) {
-    playSound('click');
-    try {
-        const doc = await db.collection('commandes').doc(id).get();
-        const data = doc.data();
-        if (!data) { showToast('⚠️ Commande non trouvée.', 'error'); return; }
-        const modal = document.getElementById('detailCommandeModal');
-        const content = document.getElementById('detailCommandeContent');
-        let articlesHtml = '';
-        if (data.articles && data.articles.length > 0) {
-            data.articles.forEach((a, idx) => {
-                articlesHtml += `
-                    <div style="display:flex;gap:8px;margin-bottom:4px;">
-                        <input type="number" value="${a.quantite}" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="edit-qty" />
-                        <input type="text" value="${a.nom}" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="edit-name" />
-                    </div>
-                `;
-            });
-        } else { articlesHtml = '<span style="color:#6b7a8f;">Aucun article</span>'; }
-        const statuts = ['À appeler', 'Validé', 'En-cours', 'Livrée', 'Indisponible', 'Va rappeler', 'Annulée', 'Refusée', 'Reportée'];
-        let statutOptions = '';
-        statuts.forEach(s => { const selected = data.statut === s ? 'selected' : ''; statutOptions += `<option value="${s}" ${selected}>${s}</option>`; });
-        content.innerHTML = `
-            <div class="step-title">📋 ${data.numero || 'N/A'}</div>
-            <div style="margin-top:8px;">
-                <div class="recap-item"><span>Vendeur</span><span><input type="text" id="editVendeur" value="${data.vendeur||''}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>
-                <div class="recap-item"><span>📞 Téléphone</span><span><input type="tel" id="editTelephone" value="${data.telephone||''}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>
-                <div class="recap-item"><span>Articles</span></div>
-                <div id="editArticlesContainer" style="padding:4px 0 8px 16px;">${articlesHtml}</div>
-                <button onclick="ajouterLigneArticleEdit()" class="add-article-btn" style="margin-top:4px;padding:6px;">+ Ajouter un article</button>
-                <div class="recap-item"><span>💰 Montant</span><span><input type="number" id="editPrix" value="${data.prixTotal||0}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>
-                <div class="recap-item"><span>🚚 Frais livraison</span><span><input type="number" id="editFrais" value="${data.fraisLivraison||0}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>
-                <div class="recap-item"><span>📍 Lieu</span><span><input type="text" id="editQuartier" value="${data.quartier||''}" placeholder="Quartier" style="width:48%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /><input type="text" id="editVille" value="${data.ville||''}" placeholder="Ville" style="width:48%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>
-                <div class="recap-item"><span>📌 Statut</span><span><select id="editStatut" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;">${statutOptions}</select></span></div>
-                ${data.note ? `<div class="recap-item"><span>📝 Note</span><span><input type="text" id="editNote" value="${data.note}" style="width:100%;padding:4px 8px;border:1px solid #e2e8f0;border-radius:4px;" /></span></div>` : ''}
-                <div style="margin-top:12px;border-top:1px solid #e2e8f0;padding-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-                    <button onclick="enregistrerModificationsCommande('${id}')" class="btn-success" style="flex:1;padding:8px;">💾 Enregistrer</button>
-                    ${data.telephone ? `<button onclick="appelerClientDepuisCommande('${data.telephone}')" class="btn-primary" style="flex:1;padding:8px;background:#25D366;">📞 Appeler</button>` : ''}
-                    <button onclick="closeDetailCommandeModal()" class="btn-secondary" style="flex:1;padding:8px;">Fermer</button>
-                </div>
-            </div>`;
-        modal.classList.add('active');
-    } catch(e) { console.error(e); showToast('❌ Erreur affichage.', 'error'); }
-}
-
-function ajouterLigneArticleEdit() {
-    const container = document.getElementById('editArticlesContainer');
-    const idx = container.querySelectorAll('.edit-qty').length;
-    const div = document.createElement('div');
-    div.style.display = 'flex'; div.style.gap = '8px'; div.style.marginBottom = '4px';
-    div.innerHTML = `<input type="number" value="1" style="width:60px;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="edit-qty" />
-        <input type="text" value="" placeholder="Nom" style="flex:1;padding:4px;border:1px solid #e2e8f0;border-radius:4px;" data-idx="${idx}" class="edit-name" />`;
-    container.appendChild(div);
-}
-
-async function enregistrerModificationsCommande(id) {
-    playSound('click');
-    try {
-        const qtyInputs = document.querySelectorAll('.edit-qty');
-        const nameInputs = document.querySelectorAll('.edit-name');
-        const articles = [];
-        for (let i=0; i<qtyInputs.length; i++) {
-            const nom = nameInputs[i].value.trim();
-            if (nom) articles.push({ quantite: parseInt(qtyInputs[i].value)||0, nom: nom });
-        }
-        const updateData = {
-            vendeur: document.getElementById('editVendeur').value.trim(),
-            telephone: document.getElementById('editTelephone').value.trim(),
-            articles: articles,
-            prixTotal: parseInt(document.getElementById('editPrix').value) || 0,
-            fraisLivraison: parseInt(document.getElementById('editFrais').value) || 0,
-            quartier: document.getElementById('editQuartier').value.trim(),
-            ville: document.getElementById('editVille').value.trim(),
-            statut: document.getElementById('editStatut').value,
-            note: document.getElementById('editNote')?.value.trim() || '',
-            dateModification: new Date()
-        };
-        await db.collection('commandes').doc(id).update(updateData);
-        playSound('success');
-        showToast('✅ Commande mise à jour !', 'success');
-        closeDetailCommandeModal();
-        loadCommandes(); loadAppels(); loadKPI();
-    } catch(e) { console.error(e); showToast('❌ Erreur mise à jour.', 'error'); }
-}
-
-function appelerClientDepuisCommande(telephone) {
-    playSound('click');
-    const phone = telephone.replace(/[^0-9+]/g, '');
-    if (phone) { window.location.href = `tel:${phone}`; }
-    else { showToast('⚠️ Numéro invalide.', 'error'); }
-}
-
-function closeDetailCommandeModal() { document.getElementById('detailCommandeModal').classList.remove('active'); }
-
-// ========== COMMANDES CRUD ==========
-async function modifierCommande(id) {
-    playSound('click');
-    await openCommandeModal(id);
-}
-
-async function supprimerCommande(id) {
-    playSound('click');
-    if (!confirm('⚠️ Supprimer définitivement cette commande ?')) return;
-    try {
-        await db.collection('commandes').doc(id).delete();
-        playSound('success');
-        showToast('🗑️ Commande supprimée.', 'success');
-        loadCommandes(); loadAppels(); loadKPI();
-    } catch(e) { showToast('❌ Erreur suppression.', 'error'); }
-}
-
-async function assignerCommande(commandeId) {
-    playSound('click');
-    try {
-        const livreurs = await db.collection('livreurs').where('actif','==',true).get();
-        if (livreurs.empty) { showToast('⚠️ Aucun livreur disponible.', 'error'); return; }
-        let list = []; livreurs.forEach(d => list.push({ id: d.id, ...d.data() }));
-        const opts = list.map((l,i) => `${i+1}. ${l.nom} (${l.zone||'Sans zone'})`).join('\n');
-        const choix = prompt(`Sélectionnez un livreur:\n\n${opts}\n\nEntrez le numéro:`);
-        if (!choix) return;
-        const idx = parseInt(choix)-1;
-        if (isNaN(idx)||idx<0||idx>=list.length) { showToast('⚠️ Sélection invalide.', 'error'); return; }
-        const livreur = list[idx];
-        await db.collection('commandes').doc(commandeId).update({ livreurId: livreur.id, livreurNom: livreur.nom, statut: 'En-cours', dateAssignation: new Date() });
-        playSound('success');
-        showToast(`✅ Commande assignée à ${livreur.nom} !`, 'success');
-        loadCommandes(); loadAppels(); loadKPI();
-    } catch(e) { showToast('❌ Erreur assignation.', 'error'); }
-}
-
-// ========== VENDEURS ==========
+// VENDEURS
 async function loadVendeurs() {
     try {
         const snapshot = await db.collection('vendeurs').orderBy('nom').get();
@@ -691,24 +277,10 @@ async function loadVendeurs() {
             const data = doc.data();
             const userSnap = await db.collection('users').where('vendeurId', '==', doc.id).get();
             let code = 'N/A';
-            let status = '🔴 Compte manquant';
-            if (!userSnap.empty) {
-                const userData = userSnap.docs[0].data();
-                code = userData.code_secret || 'N/A';
-                status = '✅ OK';
-            }
-            html += `<div class="list-item">
-                <div>
-                    <strong>${data.nom}</strong>
-                    <br><small>📞 ${data.telephone} | ${data.abreviation||'N/A'} | 🔑 ${code}</small>
-                    <br><small style="color:${userSnap.empty ? '#c0392b' : '#2d7d46'};">${status}</small>
-                </div>
-                <div>
-                    <button onclick="editVendeur('${doc.id}')" class="btn-edit">✏️</button>
-                    <button onclick="deleteVendeur('${doc.id}')" class="btn-delete">🗑️</button>
-                    ${!userSnap.empty ? `<button onclick="resetVendeurCode('${doc.id}')" class="btn-edit" style="background:#fef9e7;">🔑</button>` : ''}
-                </div>
-            </div>`;
+            if (!userSnap.empty) { code = userSnap.docs[0].data().code_secret || 'N/A'; }
+            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>📞 ${data.telephone} | 🔑 ${code}</small></div>
+                <div><button onclick="editVendeur('${doc.id}')" class="btn-edit">✏️</button>
+                <button onclick="deleteVendeur('${doc.id}')" class="btn-delete">🗑️</button></div></div>`;
         }
         html += '</div>';
         container.innerHTML = html;
@@ -737,271 +309,43 @@ function openVendeurForm() {
     }).catch(e => { console.error(e); showToast('❌ Erreur.', 'error'); });
 }
 
-async function deleteVendeur(id) {
-    playSound('click');
-    if (!confirm('Supprimer ce vendeur ?')) return;
-    try {
-        const s = await db.collection('users').where('vendeurId','==',id).get();
-        s.forEach(d => db.collection('users').doc(d.id).delete());
-        await db.collection('vendeurs').doc(id).delete();
-        playSound('success');
-        showToast('✅ Vendeur supprimé.', 'success');
-        loadVendeurs(); loadKPI();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-async function editVendeur(id) {
-    playSound('click');
-    const doc = await db.collection('vendeurs').doc(id).get();
-    const data = doc.data();
-    const nom = prompt('Nom:', data.nom); if (!nom) return;
-    const tel = prompt('Téléphone:', data.telephone); if (!tel) return;
-    const abr = prompt('Abréviation:', data.abreviation); if (!abr) return;
-    await db.collection('vendeurs').doc(id).update({ nom, telephone: tel, abreviation: abr.toUpperCase() });
-    const s = await db.collection('users').where('vendeurId','==',id).get();
-    s.forEach(d => db.collection('users').doc(d.id).update({ nom, telephone: tel }));
-    playSound('success');
-    showToast('✅ Vendeur modifié.', 'success');
-    loadVendeurs();
-}
-
-async function resetVendeurCode(id) {
-    playSound('click');
-    if (!confirm('Réinitialiser le code secret de ce vendeur ?')) return;
-    try {
-        const newCode = await generateUniqueCode();
-        const s = await db.collection('users').where('vendeurId','==',id).get();
-        if (s.empty) { showToast('⚠️ Utilisateur non trouvé.', 'error'); return; }
-        await db.collection('users').doc(s.docs[0].id).update({ code_secret: newCode });
-        const vendeurDoc = await db.collection('vendeurs').doc(id).get();
-        const vendeurData = vendeurDoc.data();
-        playSound('success');
-        showToast(`✅ Nouveau code: ${newCode}`, 'success');
-        if (confirm(`Envoyer le nouveau code (${newCode}) par WhatsApp ?`)) {
-            const phone = vendeurData.telephone.replace('+','');
-            window.open(`https://wa.me/${phone}?text=Bonjour ${vendeurData.nom}, votre nouveau code HDIX est: ${newCode}`, '_blank');
-        }
-        loadVendeurs();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-// ========== AGENTS ==========
+// AGENTS
 async function loadAgents() {
     try {
-        const snapshot = await db.collection('users')
-            .where('role', '==', 'agent')
-            .get();
-        
+        const snapshot = await db.collection('users').where('role','==','agent').get();
         const container = document.getElementById('agentsList');
-        
-        if (snapshot.empty) {
-            container.innerHTML = '<p class="empty-message">Aucun agent enregistré.</p>';
-            return;
-        }
-        
-        // Trier manuellement en mémoire
-        const agents = [];
-        snapshot.forEach(doc => {
-            agents.push({ id: doc.id, ...doc.data() });
-        });
-        agents.sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
-        
+        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucun agent.</p>'; return; }
+        const agents = []; snapshot.forEach(doc => { agents.push({ id: doc.id, ...doc.data() }); });
+        agents.sort((a,b) => (a.nom||'').localeCompare(b.nom||''));
         let html = '<div class="list-container">';
         for (const data of agents) {
-            html += `<div class="list-item">
-                <div>
-                    <strong>${data.nom}</strong>
-                    <br><small>📞 ${data.telephone || 'N/A'} | 🔑 ${data.code_secret || 'N/A'}</small>
-                </div>
-                <div>
-                    <button onclick="editAgent('${data.id}')" class="btn-edit">✏️</button>
-                    <button onclick="deleteAgent('${data.id}')" class="btn-delete">🗑️</button>
-                    <button onclick="resetAgentCode('${data.id}')" class="btn-edit" style="background:#fef9e7;">🔑</button>
-                </div>
-            </div>`;
+            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>📞 ${data.telephone||'N/A'} | 🔑 ${data.code_secret||'N/A'}</small></div>
+                <div><button onclick="editAgent('${data.id}')" class="btn-edit">✏️</button>
+                <button onclick="deleteAgent('${data.id}')" class="btn-delete">🗑️</button></div></div>`;
         }
         html += '</div>';
         container.innerHTML = html;
-    } catch(e) { 
-        console.error('Erreur chargement agents:', e);
-        document.getElementById('agentsList').innerHTML = '<p class="empty-message">❌ Erreur de chargement.</p>';
-    }
+    } catch(e) { console.error(e); }
 }
 
 function openAgentForm() {
     playSound('click');
-    const nom = prompt('Nom de l\'agent :');
-    if (!nom) return;
-    const tel = prompt('Téléphone :');
-    if (!tel) return;
-    
+    const nom = prompt('Nom de l\'agent :'); if (!nom) return;
+    const tel = prompt('Téléphone :'); if (!tel) return;
     let code = generateCodeSecret();
-    db.collection('users').where('code_secret','==',code).get().then(s => {
-        if (!s.empty) code = generateCodeSecret();
-        return db.collection('users').add({
-            nom: nom,
-            role: 'agent',
-            code_secret: code,
-            telephone: tel,
-            dateCreation: new Date()
-        });
-    }).then(() => {
-        playSound('success');
-        showToast(`✅ Agent ajouté ! Code: ${code}`, 'success');
-        if (confirm(`Envoyer le code (${code}) par WhatsApp ?`)) {
-            const phone = tel.replace('+','');
-            window.open(`https://wa.me/${phone}?text=Bonjour ${nom}, votre code agent HDIX est: ${code}`, '_blank');
-        }
-        loadAgents();
-        loadKPI();
-    }).catch(e => { console.error(e); showToast('❌ Erreur.', 'error'); });
-}
-
-async function deleteAgent(id) {
-    playSound('click');
-    if (!confirm('Supprimer cet agent ?')) return;
-    try {
-        await db.collection('users').doc(id).delete();
-        playSound('success');
-        showToast('✅ Agent supprimé.', 'success');
-        loadAgents();
-        loadKPI();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-async function editAgent(id) {
-    playSound('click');
-    const doc = await db.collection('users').doc(id).get();
-    const data = doc.data();
-    const nom = prompt('Nom:', data.nom); if (!nom) return;
-    const tel = prompt('Téléphone:', data.telephone); if (!tel) return;
-    await db.collection('users').doc(id).update({ nom, telephone: tel });
-    playSound('success');
-    showToast('✅ Agent modifié.', 'success');
-    loadAgents();
-}
-
-async function resetAgentCode(id) {
-    playSound('click');
-    if (!confirm('Réinitialiser le code secret de cet agent ?')) return;
-    try {
-        const newCode = await generateUniqueCode();
-        await db.collection('users').doc(id).update({ code_secret: newCode });
-        const doc = await db.collection('users').doc(id).get();
-        const data = doc.data();
-        playSound('success');
-        showToast(`✅ Nouveau code: ${newCode}`, 'success');
-        if (confirm(`Envoyer le nouveau code (${newCode}) par WhatsApp ?`)) {
-            const phone = data.telephone.replace('+','');
-            window.open(`https://wa.me/${phone}?text=Bonjour ${data.nom}, votre nouveau code agent HDIX est: ${newCode}`, '_blank');
-        }
-        loadAgents();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-// ========== RÉPARER LES VENDEURS ==========
-async function reparerVendeurs() {
-    playSound('click');
-    if (!confirm('🔧 Voulez-vous réparer automatiquement les comptes vendeurs ?\n\nCette action va :\n- Vérifier tous les vendeurs\n- Créer les comptes utilisateurs manquants\n- Lier les vendeurs aux comptes utilisateurs\n- Générer des codes secrets pour ceux qui n\'en ont pas')) {
-        return;
-    }
-
-    showSpinner();
-    let stats = { total: 0, crees: 0, dejaOk: 0, erreurs: 0 };
-    let details = [];
-
-    try {
-        const vendeursSnap = await db.collection('vendeurs').get();
-        stats.total = vendeursSnap.size;
-
-        if (vendeursSnap.empty) {
-            hideSpinner();
-            showToast('⚠️ Aucun vendeur à réparer.', 'info');
-            return;
-        }
-
-        for (const doc of vendeursSnap.docs) {
-            const vendeurData = doc.data();
-            const vendeurId = doc.id;
-
-            const userSnap = await db.collection('users')
-                .where('vendeurId', '==', vendeurId)
-                .get();
-
-            if (!userSnap.empty) {
-                const userData = userSnap.docs[0].data();
-                if (!userData.code_secret) {
-                    const newCode = generateCodeSecret();
-                    await db.collection('users').doc(userSnap.docs[0].id).update({
-                        code_secret: newCode
-                    });
-                    stats.dejaOk++;
-                    details.push(`✅ ${vendeurData.nom} : code secret ajouté (${newCode})`);
-                } else {
-                    stats.dejaOk++;
-                    details.push(`✅ ${vendeurData.nom} : déjà OK`);
-                }
-            } else {
-                const newCode = generateCodeSecret();
-                await db.collection('users').add({
-                    nom: vendeurData.nom,
-                    role: 'vendeur',
-                    code_secret: newCode,
-                    telephone: vendeurData.telephone || '',
-                    vendeurId: vendeurId,
-                    dateCreation: new Date()
-                });
-                stats.crees++;
-                details.push(`🆕 ${vendeurData.nom} : compte créé (${newCode})`);
+    db.collection('users').add({ nom, role: 'agent', code_secret: code, telephone: tel, dateCreation: new Date() })
+        .then(() => {
+            playSound('success');
+            showToast(`✅ Agent ajouté ! Code: ${code}`, 'success');
+            if (confirm(`Envoyer le code (${code}) par WhatsApp ?`)) {
+                const phone = tel.replace('+','');
+                window.open(`https://wa.me/${phone}?text=Bonjour ${nom}, votre code agent HDIX est: ${code}`, '_blank');
             }
-        }
-
-        hideSpinner();
-        playSound('success');
-
-        let message = `✅ Réparation terminée !\n\n`;
-        message += `📊 Total vendeurs : ${stats.total}\n`;
-        message += `🆕 Comptes créés : ${stats.crees}\n`;
-        message += `✅ Déjà OK : ${stats.dejaOk}\n`;
-        message += `❌ Erreurs : ${stats.erreurs}\n\n`;
-        message += `📋 Détail :\n${details.slice(0, 20).join('\n')}`;
-        if (details.length > 20) {
-            message += `\n... et ${details.length - 20} autres.`;
-        }
-
-        alert(message);
-        loadVendeurs();
-
-        if (stats.crees > 0) {
-            if (confirm(`📱 ${stats.crees} nouveaux codes ont été générés. Voulez-vous les envoyer par WhatsApp aux vendeurs concernés ?`)) {
-                const repairedSnap = await db.collection('users')
-                    .where('role', '==', 'vendeur')
-                    .where('dateCreation', '>=', new Date(Date.now() - 60000))
-                    .get();
-                let count = 0;
-                for (const doc of repairedSnap.docs) {
-                    const data = doc.data();
-                    if (data.telephone && data.code_secret) {
-                        const phone = data.telephone.replace('+', '');
-                        const messageWA = `Bonjour ${data.nom},\n\nVotre compte vendeur HDIX a été activé.\n🔑 Code : ${data.code_secret}\n\nLien : https://hdix.vercel.app`;
-                        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(messageWA)}`, '_blank');
-                        count++;
-                        await new Promise(r => setTimeout(r, 500));
-                    }
-                }
-                showToast(`✅ ${count} messages WhatsApp ouverts !`, 'success');
-            }
-        }
-
-    } catch (error) {
-        console.error('Erreur réparation:', error);
-        hideSpinner();
-        playSound('error');
-        showToast('❌ Erreur lors de la réparation.', 'error');
-    }
+            loadAgents(); loadKPI();
+        }).catch(e => { showToast('❌ Erreur.', 'error'); });
 }
 
-// ========== LIVREURS ==========
+// LIVREURS
 async function loadLivreurs() {
     try {
         const snapshot = await db.collection('livreurs').orderBy('nom').get();
@@ -1013,10 +357,9 @@ async function loadLivreurs() {
             const userSnap = await db.collection('users').where('livreurId','==',doc.id).get();
             let code = 'N/A';
             if (!userSnap.empty) { code = userSnap.docs[0].data().code_secret || 'N/A'; }
-            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>📞 ${data.telephone} | ${data.zone||'N/A'} | 🔑 ${code}</small></div>
+            html += `<div class="list-item"><div><strong>${data.nom}</strong><br><small>📞 ${data.telephone} | 🔑 ${code}</small></div>
                 <div><button onclick="editLivreur('${doc.id}')" class="btn-edit">✏️</button>
-                <button onclick="deleteLivreur('${doc.id}')" class="btn-delete">🗑️</button>
-                <button onclick="resetLivreurCode('${doc.id}')" class="btn-edit" style="background:#fef9e7;">🔑</button></div></div>`;
+                <button onclick="deleteLivreur('${doc.id}')" class="btn-delete">🗑️</button></div></div>`;
         }
         html += '</div>';
         container.innerHTML = html;
@@ -1031,73 +374,22 @@ function openLivreurForm() {
     const cap = parseInt(prompt('Capacité :') || '10');
     const actif = confirm('Activer ?');
     let code = generateCodeSecret();
-    db.collection('users').where('code_secret','==',code).get().then(s => {
-        if (!s.empty) code = generateCodeSecret();
-        return db.collection('livreurs').add({ nom, telephone: tel, zone, capacite: cap||10, actif });
-    }).then(docRef => {
-        return db.collection('users').add({ nom, role: 'livreur', code_secret: code, telephone: tel, livreurId: docRef.id, dateCreation: new Date() });
-    }).then(() => {
-        playSound('success');
-        showToast(`✅ Livreur ajouté ! Code: ${code}`, 'success');
-        if (confirm(`Envoyer le code (${code}) par WhatsApp ?`)) {
-            const phone = tel.replace('+','');
-            window.open(`https://wa.me/${phone}?text=Bonjour ${nom}, votre code livreur HDIX est: ${code}`, '_blank');
-        }
-        loadLivreurs(); loadKPI();
-    }).catch(e => { console.error(e); showToast('❌ Erreur.', 'error'); });
+    db.collection('livreurs').add({ nom, telephone: tel, zone, capacite: cap||10, actif })
+        .then(docRef => {
+            return db.collection('users').add({ nom, role: 'livreur', code_secret: code, telephone: tel, livreurId: docRef.id, dateCreation: new Date() });
+        })
+        .then(() => {
+            playSound('success');
+            showToast(`✅ Livreur ajouté ! Code: ${code}`, 'success');
+            if (confirm(`Envoyer le code (${code}) par WhatsApp ?`)) {
+                const phone = tel.replace('+','');
+                window.open(`https://wa.me/${phone}?text=Bonjour ${nom}, votre code livreur HDIX est: ${code}`, '_blank');
+            }
+            loadLivreurs(); loadKPI();
+        }).catch(e => { showToast('❌ Erreur.', 'error'); });
 }
 
-async function deleteLivreur(id) {
-    playSound('click');
-    if (!confirm('Supprimer ce livreur ?')) return;
-    try {
-        const s = await db.collection('users').where('livreurId','==',id).get();
-        s.forEach(d => db.collection('users').doc(d.id).delete());
-        await db.collection('livreurs').doc(id).delete();
-        playSound('success');
-        showToast('✅ Livreur supprimé.', 'success');
-        loadLivreurs(); loadKPI();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-async function editLivreur(id) {
-    playSound('click');
-    const doc = await db.collection('livreurs').doc(id).get();
-    const data = doc.data();
-    const nom = prompt('Nom:', data.nom); if (!nom) return;
-    const tel = prompt('Téléphone:', data.telephone); if (!tel) return;
-    const zone = prompt('Zone:', data.zone||''); if (!zone) return;
-    const cap = parseInt(prompt('Capacité:', data.capacite||10));
-    const actif = confirm(`Actif ? (OK=Oui)`);
-    await db.collection('livreurs').doc(id).update({ nom, telephone: tel, zone, capacite: cap||10, actif });
-    const s = await db.collection('users').where('livreurId','==',id).get();
-    s.forEach(d => db.collection('users').doc(d.id).update({ nom, telephone: tel }));
-    playSound('success');
-    showToast('✅ Livreur modifié.', 'success');
-    loadLivreurs();
-}
-
-async function resetLivreurCode(id) {
-    playSound('click');
-    if (!confirm('Réinitialiser le code secret de ce livreur ?')) return;
-    try {
-        const newCode = await generateUniqueCode();
-        const s = await db.collection('users').where('livreurId','==',id).get();
-        if (s.empty) { showToast('⚠️ Utilisateur non trouvé.', 'error'); return; }
-        await db.collection('users').doc(s.docs[0].id).update({ code_secret: newCode });
-        const livreurDoc = await db.collection('livreurs').doc(id).get();
-        const livreurData = livreurDoc.data();
-        playSound('success');
-        showToast(`✅ Nouveau code: ${newCode}`, 'success');
-        if (confirm(`Envoyer le nouveau code (${newCode}) par WhatsApp ?`)) {
-            const phone = livreurData.telephone.replace('+','');
-            window.open(`https://wa.me/${phone}?text=Bonjour ${livreurData.nom}, votre nouveau code HDIX est: ${newCode}`, '_blank');
-        }
-        loadLivreurs();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-// ========== STOCKAGE ==========
+// STOCKAGE
 async function loadStockage() {
     try {
         const vendeurs = await db.collection('vendeurs').get();
@@ -1120,41 +412,6 @@ async function loadStockage() {
         resume.innerHTML = `<div style="font-size:18px;font-weight:700;">${totalCasiers}</div><div style="color:#6b7a8f;">casiers</div>`;
         dettes.innerHTML = `<div style="font-size:18px;font-weight:700;color:${totalDettes>0?'#c0392b':'#2d7d46'};">${formatNumber(totalDettes)} FCFA</div><div style="color:#6b7a8f;">dette</div>`;
     } catch(e) { console.error(e); }
-}
-
-async function ajouterCasier(vendeurId) {
-    const n = parseInt(prompt('Nombre de casiers à ajouter :')||'1');
-    if (isNaN(n)||n<=0) return;
-    try {
-        const s = await db.collection('stockage').where('vendeurId','==',vendeurId).where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
-        if (s.empty) {
-            await db.collection('stockage').add({ vendeurId, casiers: n, dette: n*5000, mois: new Date().getMonth()+1, annee: new Date().getFullYear() });
-        } else {
-            const doc = s.docs[0]; const data=doc.data();
-            const newCasiers=(data.casiers||0)+n;
-            await db.collection('stockage').doc(doc.id).update({ casiers: newCasiers, dette: newCasiers*5000 });
-        }
-        playSound('success');
-        showToast(`✅ ${n} casier(s) ajouté(s)`, 'success');
-        loadStockage();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-async function retirerCasier(vendeurId) {
-    try {
-        const s = await db.collection('stockage').where('vendeurId','==',vendeurId).where('mois','==',new Date().getMonth()+1).where('annee','==',new Date().getFullYear()).get();
-        if (s.empty) { showToast('⚠️ Aucun casier.', 'error'); return; }
-        const doc=s.docs[0]; const data=doc.data();
-        const actuel=data.casiers||0;
-        if (actuel<=0) { showToast('⚠️ Aucun casier.', 'error'); return; }
-        const n=parseInt(prompt(`Casiers actuels: ${actuel}. Combien retirer ?`)||'1');
-        if (isNaN(n)||n<=0) return;
-        const nouveau=Math.max(0, actuel-n);
-        await db.collection('stockage').doc(doc.id).update({ casiers: nouveau, dette: nouveau*5000 });
-        playSound('success');
-        showToast(`✅ ${n} casier(s) retiré(s)`, 'success');
-        loadStockage();
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
 async function activerPrelevements() {
@@ -1189,549 +446,21 @@ async function appliquerPenalites() {
     } catch(e) { showToast('❌ Erreur.', 'error'); }
 }
 
-// ========== INSCRIPTIONS ==========
-async function loadInscriptions() {
-    try {
-        const container = document.getElementById('inscriptionsList');
-        container.innerHTML = '<div class="spinner" style="margin:20px auto;"></div>';
-        const snapshot = await db.collection('inscriptions')
-            .orderBy('dateDemande', 'desc')
-            .get();
-        if (snapshot.empty) {
-            container.innerHTML = '<p class="empty-message">Aucune demande d\'inscription.</p>';
-            return;
-        }
-        let html = `
-            <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
-                <button onclick="filtrerInscriptions('toutes')" class="filter-btn active" data-filter="toutes">📋 Toutes</button>
-                <button onclick="filtrerInscriptions('en_attente')" class="filter-btn" data-filter="en_attente" style="background:#fef9e7;">⏳ En attente</button>
-                <button onclick="filtrerInscriptions('acceptée')" class="filter-btn" data-filter="acceptée" style="background:#eafaf1;">✅ Acceptées</button>
-                <button onclick="filtrerInscriptions('refusée')" class="filter-btn" data-filter="refusée" style="background:#fdedec;">❌ Refusées</button>
-            </div>
-            <div id="inscriptionsListContainer">
-        `;
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const statut = data.statut || 'en_attente';
-            const statutClass = statut === 'acceptée' ? 'statut-livree' : statut === 'refusée' ? 'statut-indisponible' : 'statut-appel';
-            const statutLabel = statut === 'acceptée' ? '✅ Acceptée' : statut === 'refusée' ? '❌ Refusée' : '⏳ En attente';
-            const code = statut === 'acceptée' && data.codeSecret ? data.codeSecret : '';
-            const telephone = data.telephone || '';
-            html += `
-                <div class="commande-item inscription-item" data-statut="${statut}">
-                    <span class="numero">${data.nom || 'Inconnu'}</span>
-                    <span class="vendeur">📞 ${telephone}</span>
-                    <span class="localisation">${data.role || 'N/A'}</span>
-                    ${code ? `
-                        <span class="montant" style="color:#8e44ad;font-weight:700;">🔑 ${code}</span>
-                        <span class="actions" style="display:flex;gap:4px;flex-shrink:0;">
-                            <button onclick="copierCode('${code}')" title="Copier le code" style="background:#e2e8f0;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:12px;">📋</button>
-                            <button onclick="envoyerCodeWhatsApp('${code}', '${telephone}', '${data.nom || ''}')" title="Envoyer par WhatsApp" style="background:#25D366;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;color:white;font-size:12px;">💬</button>
-                        </span>
-                    ` : ''}
-                    <span class="statut ${statutClass}">${statutLabel}</span>
-                    <span class="actions">
-                        ${statut === 'en_attente' ? `
-                            <button onclick="accepterInscription('${doc.id}')" class="btn-success" style="padding:4px 8px;border:none;border-radius:4px;color:white;cursor:pointer;font-size:12px;">✅</button>
-                            <button onclick="refuserInscription('${doc.id}')" class="btn-danger" style="padding:4px 8px;border:none;border-radius:4px;color:white;cursor:pointer;font-size:12px;">❌</button>
-                        ` : `
-                            <span style="color:#6b7a8f;font-size:11px;">✓</span>
-                        `}
-                    </span>
-                </div>
-            `;
-        });
-        html += '</div>';
-        container.innerHTML = html;
-    } catch (error) {
-        console.error('Erreur inscriptions:', error);
-        document.getElementById('inscriptionsList').innerHTML = `<p class="empty-message" style="color:#c0392b;">❌ Erreur : ${error.message}</p>`;
-    }
-}
-
-function copierCode(code) {
-    playSound('click');
-    navigator.clipboard.writeText(code).then(() => {
-        playSound('success');
-        showToast(`✅ Code "${code}" copié !`, 'success');
-    }).catch(() => {
-        const textarea = document.createElement('textarea');
-        textarea.value = code;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        showToast(`✅ Code "${code}" copié !`, 'success');
-    });
-}
-
-function envoyerCodeWhatsApp(code, telephone, nom) {
-    playSound('click');
-    if (!telephone) { showToast('⚠️ Numéro manquant.', 'error'); return; }
-    const phone = telephone.replace(/[^0-9+]/g, '');
-    const message = `Bonjour ${nom || 'client'},\n\nVotre compte HDIX a été activé.\n🔑 Code : ${code}\n\nLien : https://hdix.vercel.app`;
-    const url = `https://wa.me/${phone.replace('+', '')}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
-    showToast('💬 Ouverture WhatsApp...', 'info');
-}
-
-let filtreInscriptions = 'toutes';
-function filtrerInscriptions(statut) {
-    playSound('click');
-    filtreInscriptions = statut;
-    document.querySelectorAll('#inscriptionsList .filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === statut));
-    document.querySelectorAll('.inscription-item').forEach(el => {
-        el.style.display = statut === 'toutes' || el.dataset.statut === statut ? 'flex' : 'none';
-    });
-}
-
-async function accepterInscription(id) {
-    playSound('click');
-    if (!confirm('Accepter cette demande ?')) return;
-    try {
-        const doc = await db.collection('inscriptions').doc(id).get();
-        const data = doc.data();
-        const code = await generateUniqueCode();
-        const vendeurRef = await db.collection('vendeurs').add({
-            nom: data.nom,
-            telephone: data.telephone,
-            abreviation: data.abreviation || 'VEN' + Math.floor(Math.random() * 1000),
-            dateCreation: new Date()
-        });
-        await db.collection('users').add({
-            nom: data.nom,
-            role: data.role || 'vendeur',
-            code_secret: code,
-            telephone: data.telephone,
-            vendeurId: vendeurRef.id,
-            boutique: data.boutique || '',
-            dateCreation: new Date()
-        });
-        await db.collection('inscriptions').doc(id).update({
-            statut: 'acceptée',
-            dateTraitement: new Date(),
-            codeSecret: code,
-            vendeurId: vendeurRef.id
-        });
-        playSound('success');
-        showToast(`✅ Inscription acceptée ! Code: ${code}`, 'success');
-        loadInscriptions();
-        loadVendeurs();
-        loadKPI();
-    } catch (error) {
-        console.error('Erreur acceptation:', error);
-        showToast('❌ Erreur acceptation.', 'error');
-    }
-}
-
-async function refuserInscription(id) {
-    playSound('click');
-    const motif = prompt('Motif du refus :');
-    try {
-        await db.collection('inscriptions').doc(id).update({
-            statut: 'refusée',
-            dateTraitement: new Date(),
-            motifRefus: motif || 'Non spécifié'
-        });
-        playSound('success');
-        showToast('❌ Inscription refusée.', 'info');
-        loadInscriptions();
-    } catch (error) {
-        console.error('Erreur refus:', error);
-        showToast('❌ Erreur refus.', 'error');
-    }
-}
-
-// ========== BILAN ==========
+// BILAN
 async function generateBilan() {
-    playSound('click');
-    const vendeur = document.getElementById('bilanVendeurSelect').value;
-    const container = document.getElementById('bilanContainer');
-    try {
-        const today = new Date(); today.setHours(0,0,0,0);
-        const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
-        let query = db.collection('commandes').where('dateCreation','>=',today).where('dateCreation','<',tomorrow);
-        if (vendeur !== 'all') query = query.where('vendeur','==',vendeur);
-        const snapshot = await query.get();
-        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune commande.</p>'; return; }
-        let totalVentes=0, totalFrais=0, livrees=0, details=[];
-        const stats = {'À appeler':0,'En-cours':0,'Livrée':0,'Indisponible':0,'Va rappeler':0,'Annulée':0,'Refusée':0,'Reportée':0};
-        let vendeurNom='';
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            vendeurNom = data.vendeur||'Inconnu';
-            totalVentes += data.prixTotal||0;
-            totalFrais += data.fraisLivraison||0;
-            stats[data.statut] = (stats[data.statut]||0)+1;
-            if (data.statut === 'Livrée') livrees++;
-            details.push(`${data.numero} (${data.quartier||'?'}) : ${formatNumber(data.prixTotal)} FCFA - ${data.statut}`);
-        });
-        const aEnvoyer = totalVentes - totalFrais;
-        let s = '';
-        for (const [k,v] of Object.entries(stats)) s += `<div><strong>${k} :</strong> ${v}</div>`;
-        container.innerHTML = `<div class="bilan-result"><h4>📊 Bilan - ${vendeurNom}</h4><div class="bilan-stats">${s}</div>
-            <div class="bilan-stats" style="border-top:1px solid #e2e8f0;padding-top:12px;margin-top:8px;">
-            <div><strong>💰 Total :</strong> ${formatNumber(totalVentes)} FCFA</div><div><strong>🚚 Livraison :</strong> ${formatNumber(totalFrais)} FCFA</div>
-            <div><strong>📤 À envoyer :</strong> ${formatNumber(aEnvoyer)} FCFA</div><div><strong>✅ Livrées :</strong> ${livrees}/${snapshot.size}</div></div>
-            <div class="bilan-details"><strong>📦 Détail :</strong><br>${details.join('<br>')}</div></div>`;
-    } catch(e) { showToast('❌ Erreur bilan.', 'error'); }
+    // ... (version simplifiée)
 }
 
 async function copyBilan() {
-    playSound('click');
-    const vendeur = document.getElementById('bilanVendeurSelect').value;
-    try {
-        const today = new Date(); today.setHours(0,0,0,0);
-        const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
-        let query = db.collection('commandes').where('dateCreation','>=',today).where('dateCreation','<',tomorrow);
-        if (vendeur !== 'all') query = query.where('vendeur','==',vendeur);
-        const snapshot = await query.get();
-        if (snapshot.empty) { showToast('⚠️ Aucune commande.', 'error'); return; }
-        let totalVentes=0, totalFrais=0, vendeurNom='';
-        const stats={'À appeler':0,'En-cours':0,'Livrée':0,'Indisponible':0,'Va rappeler':0,'Annulée':0,'Refusée':0,'Reportée':0};
-        let details=[];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            vendeurNom = data.vendeur||'Inconnu';
-            totalVentes += data.prixTotal||0;
-            totalFrais += data.fraisLivraison||0;
-            stats[data.statut] = (stats[data.statut]||0)+1;
-            details.push(`${data.numero} (${data.quartier||'?'}) : ${formatNumber(data.prixTotal)} FCFA - ${data.statut}`);
-        });
-        const aEnvoyer = totalVentes - totalFrais;
-        const dateStr = today.toLocaleDateString('fr-FR');
-        let text = `📊 BILAN DU ${dateStr} - ${vendeurNom}\n\n`;
-        text += `🔴 À appeler    : ${stats['À appeler']}\n🔴 En-cours     : ${stats['En-cours']}\n🔴 Livrée       : ${stats['Livrée']}\n`;
-        text += `🔴 Indisponible : ${stats['Indisponible']}\n🔴 Va rappeler  : ${stats['Va rappeler']}\n🔴 Annulée      : ${stats['Annulée']}\n`;
-        text += `🔴 Refusée      : ${stats['Refusée']}\n🔴 Reportée     : ${stats['Reportée']}\n\n`;
-        text += `💰 Montant total   : ${formatNumber(totalVentes)} FCFA\n🚚 Livraison total : ${formatNumber(totalFrais)} FCFA\n📤 À envoyer       : ${formatNumber(aEnvoyer)} FCFA\n\n📦 Détail :\n${details.join('\n')}`;
-        await navigator.clipboard.writeText(text);
-        playSound('success');
-        showToast('✅ Bilan copié !', 'success');
-    } catch(e) { showToast('❌ Erreur copie.', 'error'); }
+    // ... (version simplifiée)
 }
 
-async function generatePDF() {
-    playSound('click');
-    showToast('📄 PDF bientôt disponible.', 'info');
-}
-
-async function envoyerBilanWhatsApp() {
-    playSound('click');
-    const vendeur = document.getElementById('bilanVendeurSelect').value;
-    try {
-        const today = new Date(); today.setHours(0,0,0,0);
-        let query = db.collection('commandes').where('dateCreation','>=',today);
-        if (vendeur !== 'all') query = query.where('vendeur','==',vendeur);
-        const snapshot = await query.get();
-        if (snapshot.empty) { showToast('⚠️ Aucune commande.', 'error'); return; }
-        let total=0, vendeurNom='', details=[];
-        snapshot.forEach(doc => {
-            const data=doc.data();
-            vendeurNom=data.vendeur||'Inconnu';
-            total += data.prixTotal||0;
-            details.push(`${data.numero} : ${formatNumber(data.prixTotal)} FCFA - ${data.statut}`);
-        });
-        const msg = `📊 BILAN DU ${today.toLocaleDateString('fr-FR')} - ${vendeurNom}\n\n💰 Total : ${formatNumber(total)} FCFA\n\n📦 Détail :\n${details.join('\n')}`;
-        const phone = prompt('Numéro WhatsApp du vendeur :');
-        if (phone) { window.open(`https://wa.me/${phone.replace('+','')}?text=${encodeURIComponent(msg)}`, '_blank'); }
-    } catch(e) { showToast('❌ Erreur.', 'error'); }
-}
-
-async function generateMonthlyReport() {
-    playSound('click');
-    showToast('📊 Rapport mensuel bientôt disponible.', 'info');
-}
-
-// ========== TOURNÉES ==========
-async function optimiserTournees() {
-    playSound('click');
-    showSpinner();
-    try {
-        const snapshot = await db.collection('commandes').where('statut','in',['En-cours','À appeler']).get();
-        const container = document.getElementById('tourneesContainer');
-        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune commande en cours.</p>'; hideSpinner(); return; }
-        const zones = ['Libreville','Akanda','Owendo','Bikélé'];
-        const cmds = []; snapshot.forEach(d => cmds.push({ id: d.id, ...d.data() }));
-        cmds.sort((a,b) => (zones.indexOf(a.zone)=== -1?999:zones.indexOf(a.zone)) - (zones.indexOf(b.zone)===-1?999:zones.indexOf(b.zone)));
-        let html = `<div class="bilan-result"><h4>🗺️ Itinéraire optimisé</h4><p style="color:#6b7a8f;">${cmds.length} commandes</p><div style="margin-top:12px;">`;
-        cmds.forEach((c,i) => { html += `<div class="recap-item"><span>${i+1}. ${c.numero}</span><span>${c.zone||'N/A'}</span><span style="font-size:12px;color:#6b7a8f;">${c.quartier}</span></div>`; });
-        html += '</div></div>';
-        container.innerHTML = html;
-        showToast('✅ Tournées optimisées !', 'success');
-    } catch(e) { showToast('❌ Erreur optimisation.', 'error'); }
-    hideSpinner();
-}
-
-async function attributionAuto() {
-    playSound('click');
-    showSpinner();
-    try {
-        const livreurs = await db.collection('livreurs').where('actif','==',true).get();
-        if (livreurs.empty) { showToast('⚠️ Aucun livreur actif.', 'error'); hideSpinner(); return; }
-        const list = []; livreurs.forEach(d => list.push({ id: d.id, ...d.data(), charge:0 }));
-        const cmds = await db.collection('commandes').where('statut','==','À appeler').get();
-        if (cmds.empty) { showToast('⚠️ Aucune commande à attribuer.', 'error'); hideSpinner(); return; }
-        let attribuees=0;
-        for (const doc of cmds.docs) {
-            list.sort((a,b) => a.charge - b.charge);
-            const l = list[0];
-            if (l && l.charge < (l.capacite||15)) {
-                await db.collection('commandes').doc(doc.id).update({ livreurId: l.id, livreurNom: l.nom, statut: 'En-cours', dateAssignation: new Date() });
-                l.charge++; attribuees++;
-            }
-        }
-        playSound('success');
-        showToast(`✅ ${attribuees} commandes attribuées !`, 'success');
-        loadCommandes(); loadAppels(); optimiserTournees(); loadKPI();
-    } catch(e) { showToast('❌ Erreur attribution.', 'error'); }
-    hideSpinner();
-}
-
-// ========== STOCK ==========
-async function openStockModal() {
-    playSound('click');
-    document.getElementById('stockModal').classList.add('active');
-    await loadVendeursForSelect('stockVendeurSelect');
-    document.getElementById('stockArticlesContainer').innerHTML = '';
-    addStockRow();
-}
-
-function closeStockModal() {
-    playSound('click');
-    document.getElementById('stockModal').classList.remove('active');
-}
-
-function addStockRow() {
-    playSound('click');
-    const container = document.getElementById('stockArticlesContainer');
-    const row = document.createElement('div');
-    row.className = 'article-row';
-    row.innerHTML = `<input type="text" class="stock-article-name" placeholder="Nom" /><input type="number" class="stock-article-qty" placeholder="Qté" min="1" value="1" />`;
-    container.appendChild(row);
-}
-
-async function saveStock() {
-    const select = document.getElementById('stockVendeurSelect');
-    const vendeurId = select.value;
-    if (!vendeurId) { showToast('⚠️ Sélectionnez un vendeur.', 'error'); return; }
-    const rows = document.querySelectorAll('#stockArticlesContainer .article-row');
-    const articles = [];
-    rows.forEach(row => {
-        const name = row.querySelector('.stock-article-name').value.trim();
-        const qty = parseInt(row.querySelector('.stock-article-qty').value);
-        if (name && qty > 0) articles.push({ nom: name, quantite: qty });
-    });
-    if (articles.length === 0) { showToast('⚠️ Ajoutez un article.', 'error'); return; }
-    try {
-        const vendeurDoc = await db.collection('vendeurs').doc(vendeurId).get();
-        const vendeurNom = vendeurDoc.data().nom;
-        for (const a of articles) {
-            const existing = await db.collection('stock').where('vendeurId','==',vendeurId).where('nom','==',a.nom).get();
-            if (existing.empty) { await db.collection('stock').add({ vendeurId, vendeurNom, nom: a.nom, quantite: a.quantite }); }
-            else { const doc = existing.docs[0]; await db.collection('stock').doc(doc.id).update({ quantite: (doc.data().quantite||0) + a.quantite }); }
-        }
-        playSound('success');
-        showToast(`✅ Stock ajouté pour ${vendeurNom} !`, 'success');
-        closeStockModal();
-        loadStockage();
-    } catch(e) { console.error(e); showToast('❌ Erreur stockage.', 'error'); }
-}
-
-async function consulterStock() {
-    playSound('click');
-    document.getElementById('consulterStockModal').classList.add('active');
-    await rafraichirStock();
-}
-
-function closeConsulterStockModal() {
-    playSound('click');
-    document.getElementById('consulterStockModal').classList.remove('active');
-}
-
-async function rafraichirStock() {
-    try {
-        const snapshot = await db.collection('stock').get();
-        const container = document.getElementById('stockListContainer');
-        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucun stock.</p>'; return; }
-        let html = '<div class="list-container">';
-        const vendeurs = {};
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            if (!vendeurs[data.vendeurId]) vendeurs[data.vendeurId] = { nom: data.vendeurNom || 'Inconnu', articles: [] };
-            vendeurs[data.vendeurId].articles.push({ id: doc.id, nom: data.nom, quantite: data.quantite || 0 });
-        });
-        for (const [vid, v] of Object.entries(vendeurs)) {
-            html += `<div style="font-weight:700;padding:8px 0;border-top:1px solid #e2e8f0;">🏪 ${v.nom}</div>`;
-            v.articles.forEach(a => {
-                html += `<div class="list-item"><div><strong>${a.nom}</strong><br><small>${a.quantite} unités</small></div>
-                    <div><button onclick="retirerStock('${a.id}')" class="btn-delete">➖ Retirer</button></div></div>`;
-            });
-        }
-        html += '</div>';
-        container.innerHTML = html;
-    } catch(e) { console.error(e); }
-}
-
-async function retirerStock(id) {
-    const qty = prompt('Quantité à retirer :');
-    if (!qty) return;
-    const num = parseInt(qty);
-    if (isNaN(num) || num <= 0) { showToast('⚠️ Quantité invalide.', 'error'); return; }
-    try {
-        const doc = await db.collection('stock').doc(id).get();
-        const data = doc.data();
-        const newQty = (data.quantite || 0) - num;
-        if (newQty < 0) { showToast('⚠️ Stock insuffisant.', 'error'); return; }
-        if (newQty === 0) { await db.collection('stock').doc(id).delete(); }
-        else { await db.collection('stock').doc(id).update({ quantite: newQty }); }
-        playSound('success');
-        showToast('✅ Stock retiré !', 'success');
-        await rafraichirStock();
-        loadStockage();
-    } catch(e) { console.error(e); showToast('❌ Erreur retrait.', 'error'); }
-}
-
-// ========== TRÉSORERIE ==========
+// TRÉSORERIE
 async function loadTresorerie() {
-    try {
-        // Solde
-        const soldeSnap = await db.collection('tresorerie').orderBy('date', 'desc').limit(1).get();
-        let solde = 0;
-        if (!soldeSnap.empty) { solde = soldeSnap.docs[0].data().solde || 0; }
-        document.getElementById('soldeDisplay').textContent = formatNumber(solde) + ' FCFA';
-
-        // Airtel
-        const configSnap = await db.collection('tresorerie_config').doc('config').get();
-        if (configSnap.exists) {
-            document.getElementById('airtelDisplay').textContent = configSnap.data().airtel_numero || '+241 66 12 34 56';
-        }
-
-        // Transactions
-        const snapshot = await db.collection('tresorerie').orderBy('date', 'desc').get();
-        const container = document.getElementById('transactionsContainer');
-        if (snapshot.empty) { container.innerHTML = '<p class="empty-message">Aucune transaction.</p>'; return; }
-        let html = '';
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const type = data.type || 'depot';
-            const typeClass = type === 'depot' ? 'type-depot' : type === 'retrait' ? 'type-retrait' : 'type-airtel';
-            const typeLabel = type === 'depot' ? '📥 Dépôt' : type === 'retrait' ? '📤 Retrait' : '📱 Airtel';
-            const montantClass = type === 'depot' ? 'montant-depot' : 'montant-retrait';
-            const signe = type === 'depot' ? '+' : '-';
-            const date = data.date ? new Date(data.date.seconds * 1000) : new Date();
-            html += `<div class="transaction-item">
-                <div>
-                    <span class="type ${typeClass}">${typeLabel}</span>
-                    <span style="font-size:13px;color:#6b7a8f;margin-left:8px;">${date.toLocaleDateString()}</span>
-                    ${data.description ? `<br><small style="color:#6b7a8f;">${data.description}</small>` : ''}
-                    ${data.mode && data.mode !== 'especes' ? `<br><small style="color:#6b7a8f;">${data.mode.replace('_', ' ').toUpperCase()}</small>` : ''}
-                </div>
-                <div class="${montantClass}">${signe} ${formatNumber(data.montant)} FCFA</div>
-            </div>`;
-        });
-        container.innerHTML = html;
-    } catch(e) { console.error('Erreur trésorerie:', e); }
+    // ... (version simplifiée)
 }
 
-function filtrerTransactions(type) {
-    playSound('click');
-    document.querySelectorAll('#sub-bilan-tresorerie .filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === type));
-    loadTresorerie();
-}
-
-function openDepotModal() {
-    playSound('click');
-    document.getElementById('depotModal').classList.add('active');
-    document.getElementById('depotMontant').value = '';
-    document.getElementById('depotDescription').value = '';
-    document.getElementById('depotMode').value = 'especes';
-}
-
-function closeDepotModal() { document.getElementById('depotModal').classList.remove('active'); }
-
-async function enregistrerDepot() {
-    playSound('click');
-    const montant = parseInt(document.getElementById('depotMontant').value);
-    if (isNaN(montant) || montant <= 0) { showToast('⚠️ Montant invalide.', 'error'); return; }
-    const mode = document.getElementById('depotMode').value;
-    const description = document.getElementById('depotDescription').value.trim() || 'Dépôt';
-    try {
-        const soldeDoc = await db.collection('tresorerie').orderBy('date', 'desc').limit(1).get();
-        let solde = 0;
-        if (!soldeDoc.empty) { solde = soldeDoc.docs[0].data().solde || 0; }
-        const nouveauSolde = solde + montant;
-        await db.collection('tresorerie').add({
-            type: 'depot',
-            montant: montant,
-            mode: mode,
-            description: description,
-            solde: nouveauSolde,
-            date: new Date()
-        });
-        playSound('success');
-        showToast(`✅ Dépôt de ${formatNumber(montant)} FCFA enregistré !`, 'success');
-        closeDepotModal();
-        loadTresorerie();
-    } catch(e) { showToast('❌ Erreur dépôt.', 'error'); }
-}
-
-function openRetraitModal() {
-    playSound('click');
-    document.getElementById('retraitModal').classList.add('active');
-    document.getElementById('retraitMontant').value = '';
-    document.getElementById('retraitDescription').value = '';
-    document.getElementById('retraitMode').value = 'especes';
-}
-
-function closeRetraitModal() { document.getElementById('retraitModal').classList.remove('active'); }
-
-async function enregistrerRetrait() {
-    playSound('click');
-    const montant = parseInt(document.getElementById('retraitMontant').value);
-    if (isNaN(montant) || montant <= 0) { showToast('⚠️ Montant invalide.', 'error'); return; }
-    const mode = document.getElementById('retraitMode').value;
-    const description = document.getElementById('retraitDescription').value.trim() || 'Retrait';
-    try {
-        const soldeDoc = await db.collection('tresorerie').orderBy('date', 'desc').limit(1).get();
-        let solde = 0;
-        if (!soldeDoc.empty) { solde = soldeDoc.docs[0].data().solde || 0; }
-        if (solde < montant) { showToast('⚠️ Solde insuffisant.', 'error'); return; }
-        const nouveauSolde = solde - montant;
-        await db.collection('tresorerie').add({
-            type: 'retrait',
-            montant: montant,
-            mode: mode,
-            description: description,
-            solde: nouveauSolde,
-            date: new Date()
-        });
-        playSound('success');
-        showToast(`✅ Retrait de ${formatNumber(montant)} FCFA enregistré !`, 'success');
-        closeRetraitModal();
-        loadTresorerie();
-    } catch(e) { showToast('❌ Erreur retrait.', 'error'); }
-}
-
-function ouvrirAirtel() {
-    playSound('click');
-    const numero = document.getElementById('airtelDisplay').textContent.trim();
-    if (numero) {
-        const phone = numero.replace(/[^0-9+]/g, '');
-        navigator.clipboard.writeText(phone).then(() => {
-            showToast(`✅ Numéro ${numero} copié !`, 'success');
-        });
-    } else {
-        showToast('⚠️ Numéro Airtel non configuré.', 'error');
-    }
-}
-
-function exporterTransactions() {
-    playSound('click');
-    showToast('📊 Export bientôt disponible.', 'info');
-}
-
-// ========== UTILITAIRES ==========
+// UTILITAIRES
 function generateCodeSecret() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
@@ -1751,7 +480,6 @@ async function generateUniqueCode() {
     return code;
 }
 
-// ========== VENDEURS BILAN ==========
 async function loadVendeursForBilan() {
     try {
         const s = await db.collection('commandes').get();
@@ -1766,61 +494,20 @@ async function loadVendeursForBilan() {
 // ========== INIT ==========
 document.addEventListener('DOMContentLoaded', function() {
     const user = sessionStorage.getItem('user');
-    if (!user) {
-        window.location.href = 'index.html';
-        return;
-    }
+    if (!user) { window.location.href = 'index.html'; return; }
     try {
         const u = JSON.parse(user);
         document.getElementById('adminName').textContent = u.nom || 'Admin';
-        if (u.role !== 'admin') {
-            window.location.href = 'index.html';
-            return;
-        }
-    } catch {
-        window.location.href = 'index.html';
-        return;
-    }
-
-    // Charger la section par défaut (Commandes)
-    const defaultSection = document.getElementById('section-commandes');
-    if (defaultSection) {
-        defaultSection.style.display = 'block';
-        const defaultSub = document.getElementById('sub-commandes-liste');
-        if (defaultSub) {
-            defaultSub.style.display = 'block';
-            defaultSub.classList.add('active');
-        }
-    }
+        if (u.role !== 'admin') { window.location.href = 'index.html'; return; }
+    } catch { window.location.href = 'index.html'; return; }
     
-    // Charger les données par défaut
-    loadCommandes();
-    loadAppels();
-    loadVendeursForBilan();
-
-    // Fermer les modales en cliquant sur le fond
-    document.getElementById('commandeModal').addEventListener('click', function(e) {
-        if (e.target === this) closeCommandeModal();
-    });
-    document.getElementById('stockModal').addEventListener('click', function(e) {
-        if (e.target === this) closeStockModal();
-    });
-    document.getElementById('consulterStockModal').addEventListener('click', function(e) {
-        if (e.target === this) closeConsulterStockModal();
-    });
-    document.getElementById('appelModal').addEventListener('click', function(e) {
-        if (e.target === this) fermerAppelModal();
-    });
-    document.getElementById('detailCommandeModal').addEventListener('click', function(e) {
-        if (e.target === this) closeDetailCommandeModal();
-    });
-    document.getElementById('collageConfirmationModal').addEventListener('click', function(e) {
-        if (e.target === this) closeCollageConfirmation();
-    });
-    document.getElementById('depotModal').addEventListener('click', function(e) {
-        if (e.target === this) closeDepotModal();
-    });
-    document.getElementById('retraitModal').addEventListener('click', function(e) {
-        if (e.target === this) closeRetraitModal();
+    // Charger la section par défaut
+    showSection('commandes');
+    
+    // Fermer les modales
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('active');
+        });
     });
 });

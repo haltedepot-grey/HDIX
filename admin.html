@@ -17,34 +17,26 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <link rel="stylesheet" href="style.css" />
     <style>
-        /* ========== NAVIGATION AVEC ACCORDÉON ========== */
+        /* Navigation simplifiée */
         .admin-nav {
             display: flex;
             flex-wrap: wrap;
-            gap: 4px;
+            gap: 8px;
             margin: 16px 0 24px 0;
             border-bottom: 2px solid #e2e8f0;
             padding-bottom: 12px;
         }
 
-        .nav-item {
-            position: relative;
-        }
-
         .nav-btn {
-            padding: 10px 20px;
+            padding: 12px 24px;
             border: none;
             background: #f1f3f5;
             border-radius: 8px;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s;
             color: #4a5568;
-            touch-action: manipulation;
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
 
         .nav-btn:hover {
@@ -56,69 +48,10 @@
             color: white;
         }
 
-        .nav-btn .arrow {
-            font-size: 10px;
-            transition: transform 0.3s;
-        }
-
-        .nav-btn .arrow.open {
-            transform: rotate(180deg);
-        }
-
-        .dropdown-menu {
-            display: none;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-            min-width: 200px;
-            z-index: 100;
-            padding: 6px;
-            margin-top: 4px;
-            border: 1px solid #e2e8f0;
-        }
-
-        .dropdown-menu.open {
-            display: block;
-            animation: slideDown 0.25s ease;
-        }
-
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .dropdown-item {
-            display: block;
-            width: 100%;
-            padding: 10px 16px;
-            border: none;
-            background: transparent;
-            text-align: left;
-            cursor: pointer;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            color: #1a2b4c;
-            transition: all 0.2s;
-        }
-
-        .dropdown-item:hover {
-            background: #f1f3f5;
-        }
-
-        .dropdown-item.active {
-            background: #1a2b4c;
-            color: white;
-        }
-
-        /* Sous-sections */
-        .sub-section {
+        .section {
             display: none;
         }
-        .sub-section.active {
+        .section.active {
             display: block;
             animation: fadeIn 0.3s ease;
         }
@@ -128,15 +61,32 @@
             to { opacity: 1; }
         }
 
-        /* Responsive */
+        /* Section administration : grille 2 colonnes */
+        .admin-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .admin-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .admin-card h4 {
+            margin-bottom: 12px;
+            color: #1a2b4c;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 8px;
+        }
+
         @media (max-width: 600px) {
+            .admin-grid {
+                grid-template-columns: 1fr;
+            }
             .nav-btn {
                 font-size: 13px;
-                padding: 8px 14px;
-            }
-            .dropdown-menu {
-                min-width: 180px;
-                left: -10px;
+                padding: 10px 16px;
             }
         }
     </style>
@@ -158,112 +108,39 @@
         </div>
     </header>
 
-    <!-- ========== NAVIGATION PRINCIPALE (ACCORDÉON) ========== -->
+    <!-- ========== NAVIGATION (4 BOUTONS) ========== -->
     <div class="admin-nav">
-
-        <!-- ONGLET 1 : Commandes -->
-        <div class="nav-item">
-            <button class="nav-btn active" onclick="toggleDropdown('commandes')">
-                📦 Commandes <span class="arrow" id="arrow-commandes">▼</span>
-            </button>
-            <div class="dropdown-menu open" id="dropdown-commandes">
-                <button class="dropdown-item active" onclick="selectSubSection('commandes', 'commandes-liste', this)">📋 Liste des commandes</button>
-                <button class="dropdown-item" onclick="selectSubSection('commandes', 'commandes-appels', this)">📞 Appels clients</button>
-                <button class="dropdown-item" onclick="selectSubSection('commandes', 'commandes-tournees', this)">🚚 Tournées</button>
-            </div>
-        </div>
-
-        <!-- ONGLET 2 : Stocks (pas de dropdown) -->
-        <div class="nav-item">
-            <button class="nav-btn" onclick="showSection('stocks')">📦 Stocks</button>
-        </div>
-
-        <!-- ONGLET 3 : Administration -->
-<div class="nav-item">
-    <button class="nav-btn" onclick="toggleDropdown('administration')">
-        ⚙️ Administration <span class="arrow" id="arrow-administration">▼</span>
-    </button>
-    <div class="dropdown-menu" id="dropdown-administration">
-        <button class="dropdown-item active" onclick="selectSubSection('administration', 'admin-vendeurs', this)">👤 Vendeurs</button>
-        <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-agents', this)">👨‍💼 Agents</button>
-        <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-livreurs', this)">🚚 Livreurs</button>
-        <button class="dropdown-item" onclick="selectSubSection('administration', 'admin-inscriptions', this)">📝 Inscriptions</button>
-    </div>
-</div>
-
-        <!-- ONGLET 4 : Bilan -->
-        <div class="nav-item">
-            <button class="nav-btn" onclick="toggleDropdown('bilan')">
-                📊 Bilan <span class="arrow" id="arrow-bilan">▼</span>
-            </button>
-            <div class="dropdown-menu" id="dropdown-bilan">
-                <button class="dropdown-item active" onclick="selectSubSection('bilan', 'bilan-kpi', this)">📊 KPI</button>
-                <button class="dropdown-item" onclick="selectSubSection('bilan', 'bilan-general', this)">📊 Bilan général</button>
-                <button class="dropdown-item" onclick="selectSubSection('bilan', 'bilan-tresorerie', this)">💰 Trésorerie</button>
-            </div>
-        </div>
-
+        <button class="nav-btn active" onclick="showSection('commandes')">📦 Commandes</button>
+        <button class="nav-btn" onclick="showSection('stocks')">📦 Stocks</button>
+        <button class="nav-btn" onclick="showSection('administration')">⚙️ Administration</button>
+        <button class="nav-btn" onclick="showSection('bilan')">📊 Bilan</button>
     </div>
 
-    <!-- ========================================================== -->
-    <!-- SECTION 1 : COMMANDES                                       -->
-    <!-- ========================================================== -->
+    <!-- ========== SECTION COMMANDES ========== -->
     <div id="section-commandes" class="section active">
-
-        <!-- SOUS-SECTION : Liste des commandes -->
-        <div id="sub-commandes-liste" class="sub-section active">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-                <h3>📋 Commandes</h3>
-                <button onclick="loadCommandes()" class="refresh-btn">🔄</button>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 16px 0;gap:12px;flex-wrap:wrap;">
-                <button onclick="openCommandeModal()" class="btn-create" style="flex:1;min-width:200px;">✨ Nouvelle commande</button>
-            </div>
-            <div class="filter-buttons">
-                <button onclick="filtrerCommandes('all')" class="filter-btn active" data-filter="all">📋 Toutes</button>
-                <button onclick="filtrerCommandes('À appeler')" class="filter-btn" data-filter="À appeler" style="background:#fef9e7;">📞 À appeler</button>
-                <button onclick="filtrerCommandes('En-cours')" class="filter-btn" data-filter="En-cours" style="background:#ebf5fb;">🔄 En-cours</button>
-                <button onclick="filtrerCommandes('Livrée')" class="filter-btn" data-filter="Livrée" style="background:#eafaf1;">✅ Livrée</button>
-            </div>
-            <div class="stats-grid">
-                <div class="stat-card"><span class="stat-number" id="statAppeler">0</span><span class="stat-label">À appeler</span></div>
-                <div class="stat-card"><span class="stat-number" id="statLivree">0</span><span class="stat-label">Livrées</span></div>
-                <div class="stat-card"><span class="stat-number" id="statTotal">0</span><span class="stat-label">Total</span></div>
-            </div>
-            <div class="commandes-list"><div id="commandesContainer"><div class="spinner" style="margin:30px auto;"></div></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            <h3>📋 Commandes</h3>
+            <button onclick="loadCommandes()" class="refresh-btn">🔄</button>
         </div>
-
-        <!-- SOUS-SECTION : Appels clients -->
-        <div id="sub-commandes-appels" class="sub-section">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <h3>📞 Appels clients</h3>
-                <button onclick="loadAppels()" class="refresh-btn">🔄</button>
-            </div>
-            <div id="appelsContainer"><div class="spinner" style="margin:30px auto;"></div></div>
-            <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;">
-                <button onclick="lancerAppelSuivant()" class="btn-primary" style="flex:1;">📞 Lancer campagne</button>
-            </div>
-            <div id="appelModal" class="modal"><div class="modal-content"><button class="modal-close" onclick="fermerAppelModal()">✕</button><div id="appelContent"><p class="empty-message">Aucun appel en cours.</p></div></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 16px 0;gap:12px;flex-wrap:wrap;">
+            <button onclick="openCommandeModal()" class="btn-create" style="flex:1;min-width:200px;">✨ Nouvelle commande</button>
         </div>
-
-        <!-- SOUS-SECTION : Tournées -->
-        <div id="sub-commandes-tournees" class="sub-section">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <h3>🗺️ Tournées</h3>
-                <button onclick="optimiserTournees()" class="refresh-btn">🔄</button>
-            </div>
-            <div style="margin:16px 0;">
-                <button onclick="optimiserTournees()" class="btn-primary" style="flex:1;">🔍 Optimiser tournées</button>
-                <button onclick="attributionAuto()" class="btn-primary" style="flex:1;margin-top:8px;background:#8e44ad;">🤖 Attribution auto</button>
-            </div>
-            <div id="tourneesContainer"><p class="empty-message">Les commandes en cours seront optimisées ici.</p></div>
+        <div class="filter-buttons">
+            <button onclick="filtrerCommandes('all')" class="filter-btn active" data-filter="all">📋 Toutes</button>
+            <button onclick="filtrerCommandes('À appeler')" class="filter-btn" data-filter="À appeler" style="background:#fef9e7;">📞 À appeler</button>
+            <button onclick="filtrerCommandes('En-cours')" class="filter-btn" data-filter="En-cours" style="background:#ebf5fb;">🔄 En-cours</button>
+            <button onclick="filtrerCommandes('Livrée')" class="filter-btn" data-filter="Livrée" style="background:#eafaf1;">✅ Livrée</button>
         </div>
+        <div class="stats-grid">
+            <div class="stat-card"><span class="stat-number" id="statAppeler">0</span><span class="stat-label">À appeler</span></div>
+            <div class="stat-card"><span class="stat-number" id="statLivree">0</span><span class="stat-label">Livrées</span></div>
+            <div class="stat-card"><span class="stat-number" id="statTotal">0</span><span class="stat-label">Total</span></div>
+        </div>
+        <div class="commandes-list"><div id="commandesContainer"><div class="spinner" style="margin:30px auto;"></div></div></div>
     </div>
 
-    <!-- ========================================================== -->
-    <!-- SECTION 2 : STOCKS                                          -->
-    <!-- ========================================================== -->
-    <div id="section-stocks" class="section" style="display:none;">
+    <!-- ========== SECTION STOCKS ========== -->
+    <div id="section-stocks" class="section">
         <h3>📦 Gestion des stocks</h3>
         <div class="stockage-grid">
             <div class="stockage-card"><h4>Casiers occupés</h4><div id="stockageResume"></div></div>
@@ -274,62 +151,49 @@
         <div id="stockageList"><div class="spinner" style="margin:30px auto;"></div></div>
     </div>
 
-    <!-- ========================================================== -->
-    <!-- SECTION 3 : ADMINISTRATION (4 SOUS-SECTIONS)                -->
-    <!-- ========================================================== -->
-    <div id="section-administration" class="section" style="display:none;">
+    <!-- ========== SECTION ADMINISTRATION ========== -->
+    <div id="section-administration" class="section">
+        <h3>⚙️ Administration</h3>
+        <div class="admin-grid">
+            <!-- Vendeurs -->
+            <div class="admin-card">
+                <h4>👤 Vendeurs</h4>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                    <button onclick="openVendeurForm()" class="btn-primary" style="flex:1;min-width:120px;padding:8px;font-size:12px;">➕ Ajouter</button>
+                    <button onclick="reparerVendeurs()" class="btn-primary" style="flex:1;min-width:120px;padding:8px;font-size:12px;background:#8e44ad;">🔧 Réparer</button>
+                </div>
+                <div id="vendeursList"><div class="spinner" style="margin:20px auto;"></div></div>
+            </div>
 
-        <!-- SOUS-SECTION : Vendeurs -->
-        <div id="sub-admin-vendeurs" class="sub-section active">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <h3>👤 Vendeurs</h3>
-                <button onclick="loadVendeurs()" class="refresh-btn">🔄</button>
+            <!-- Agents -->
+            <div class="admin-card">
+                <h4>👨‍💼 Agents</h4>
+                <button onclick="openAgentForm()" class="btn-primary" style="width:100%;margin-bottom:12px;padding:8px;font-size:12px;">➕ Ajouter un agent</button>
+                <div id="agentsList"><div class="spinner" style="margin:20px auto;"></div></div>
             </div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;">
-                <button onclick="openVendeurForm()" class="btn-primary" style="flex:1;min-width:150px;">➕ Ajouter un vendeur</button>
-                <button onclick="reparerVendeurs()" class="btn-primary" style="flex:1;min-width:150px;background:#8e44ad;">🔧 Réparer les vendeurs</button>
-            </div>
-            <div id="vendeursList"><div class="spinner" style="margin:30px auto;"></div></div>
-        </div>
 
-        <!-- SOUS-SECTION : Agents -->
-        <div id="sub-admin-agents" class="sub-section">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <h3>👨‍💼 Agents</h3>
-                <button onclick="loadAgents()" class="refresh-btn">🔄</button>
+            <!-- Livreurs -->
+            <div class="admin-card">
+                <h4>🚚 Livreurs</h4>
+                <button onclick="openLivreurForm()" class="btn-primary" style="width:100%;margin-bottom:12px;padding:8px;font-size:12px;">➕ Ajouter un livreur</button>
+                <div id="livreursList"><div class="spinner" style="margin:20px auto;"></div></div>
             </div>
-            <button onclick="openAgentForm()" class="btn-primary" style="margin:12px 0;">➕ Ajouter un agent</button>
-            <div id="agentsList"><div class="spinner" style="margin:30px auto;"></div></div>
-        </div>
 
-        <!-- SOUS-SECTION : Livreurs -->
-        <div id="sub-admin-livreurs" class="sub-section">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <h3>🚚 Livreurs</h3>
-                <button onclick="loadLivreurs()" class="refresh-btn">🔄</button>
+            <!-- Inscriptions -->
+            <div class="admin-card">
+                <h4>📝 Inscriptions</h4>
+                <div id="inscriptionsList"><div class="spinner" style="margin:20px auto;"></div></div>
             </div>
-            <button onclick="openLivreurForm()" class="btn-primary" style="margin:12px 0;">➕ Ajouter un livreur</button>
-            <div id="livreursList"><div class="spinner" style="margin:30px auto;"></div></div>
-        </div>
-
-        <!-- SOUS-SECTION : Inscriptions -->
-        <div id="sub-admin-inscriptions" class="sub-section">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <h3>📝 Inscriptions</h3>
-                <button onclick="loadInscriptions()" class="refresh-btn">🔄</button>
-            </div>
-            <div id="inscriptionsList"><div class="spinner" style="margin:30px auto;"></div></div>
         </div>
     </div>
 
-    <!-- ========================================================== -->
-    <!-- SECTION 4 : BILAN                                           -->
-    <!-- ========================================================== -->
-    <div id="section-bilan" class="section" style="display:none;">
+    <!-- ========== SECTION BILAN ========== -->
+    <div id="section-bilan" class="section">
+        <h3>📊 Bilan</h3>
 
-        <!-- SOUS-SECTION : KPI -->
-        <div id="sub-bilan-kpi" class="sub-section active">
-            <h3>📊 KPI <button onclick="loadKPI()" class="refresh-btn">🔄</button></h3>
+        <!-- KPI -->
+        <div style="margin-bottom:24px;">
+            <h4>📊 KPI</h4>
             <div class="kpi-grid">
                 <div class="kpi-card"><div class="number" id="kpiTotal">0</div><div class="label">Total</div></div>
                 <div class="kpi-card"><div class="number" id="kpiAppeler">0</div><div class="label">À appeler</div></div>
@@ -344,12 +208,9 @@
             </div>
         </div>
 
-        <!-- SOUS-SECTION : Bilan général -->
-        <div id="sub-bilan-general" class="sub-section">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <h3>📊 Bilan</h3>
-                <button onclick="loadVendeursForBilan()" class="refresh-btn">🔄</button>
-            </div>
+        <!-- Bilan général -->
+        <div style="margin-bottom:24px;">
+            <h4>📊 Bilan général</h4>
             <div class="bilan-section">
                 <div class="bilan-controls">
                     <select id="bilanVendeurSelect"><option value="all">Tous les vendeurs</option></select>
@@ -360,12 +221,11 @@
                 </div>
                 <div id="bilanContainer"><p class="empty-message">Sélectionnez un vendeur et cliquez sur "Générer".</p></div>
             </div>
-            <div class="bilan-section"><h3>📈 Rapport mensuel</h3><button onclick="generateMonthlyReport()" class="btn-primary">📊 Générer rapport</button><div id="monthlyReportContainer"><p class="empty-message">Cliquez sur "Générer".</p></div></div>
         </div>
 
-        <!-- SOUS-SECTION : Trésorerie -->
-        <div id="sub-bilan-tresorerie" class="sub-section">
-            <h3>💰 Trésorerie</h3>
+        <!-- Trésorerie -->
+        <div>
+            <h4>💰 Trésorerie</h4>
             <div style="display:flex;flex-wrap:wrap;gap:16px;margin:12px 0;">
                 <div style="flex:1;min-width:150px;background:white;border-radius:12px;padding:16px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
                     <div style="font-size:14px;color:#6b7a8f;">Solde disponible</div>
@@ -382,16 +242,7 @@
                 <button onclick="openRetraitModal()" class="btn-primary" style="flex:1;background:#c0392b;">📤 Retrait</button>
                 <button onclick="exporterTransactions()" class="btn-primary" style="flex:1;background:#8e44ad;">📊 Export</button>
             </div>
-            <div class="filter-buttons">
-                <button onclick="filtrerTransactions('toutes')" class="filter-btn active" data-filter="toutes">📋 Toutes</button>
-                <button onclick="filtrerTransactions('depot')" class="filter-btn" data-filter="depot" style="background:#eafaf1;">📥 Dépôts</button>
-                <button onclick="filtrerTransactions('retrait')" class="filter-btn" data-filter="retrait" style="background:#fdedec;">📤 Retraits</button>
-                <button onclick="filtrerTransactions('airtel')" class="filter-btn" data-filter="airtel" style="background:#fef9e7;">📱 Airtel</button>
-            </div>
-            <div class="commandes-list">
-                <h3>📋 Historique des transactions</h3>
-                <div id="transactionsContainer"><div class="spinner" style="margin:30px auto;"></div></div>
-            </div>
+            <div id="transactionsContainer"><div class="spinner" style="margin:20px auto;"></div></div>
         </div>
     </div>
 
@@ -429,14 +280,6 @@
             </div>
             <div id="collageResult" style="margin-top:16px;"></div>
         </div>
-    </div>
-</div>
-
-<!-- MODALE CONFIRMATION COLLAGE -->
-<div class="modal" id="collageConfirmationModal">
-    <div class="modal-content" style="max-width:550px;">
-        <button class="modal-close" onclick="closeCollageConfirmation()">✕</button>
-        <div id="collageConfirmationContent"><div class="spinner" style="margin:20px auto;"></div></div>
     </div>
 </div>
 
